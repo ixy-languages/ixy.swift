@@ -8,33 +8,18 @@ apt-get update
 apt-get -y install software-properties-common
 apt-add-repository "deb http://deb.debian.org/debian stretch-backports main contrib non-free"
 apt-get update
-apt-get -y install clang-6.0 libpython2.7 libcurl3 libicu-dev
+apt-get -y install clang-6.0 libpython2.7 libcurl3
 
-# Install unstable libicu60
-if [ -f /etc/apt/preferences.d/swift-unstable-libicu ]
-then
-	echo "apt pinning already installed. skipping"
-else
-	cat <<EOT>> /etc/apt/preferences.d/swift-unstable-libicu
-Package: *
-Pin: release a=stable
-Pin-Priority: 700
-
-Package: *
-Pin: release a=unstable
-Pin-Priority: 600
-EOT
-	echo "apt pinning added"
-fi
-
-apt-get update
-apt-get install libicu60
 
 
 # Create Swift Folder
 cd /root/
 mkdir .swift
 cd .swift
+
+wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu55_55.1-7_amd64.deb
+dpkg -i libicu55_55.1-7_amd64.deb
+rm libicu55_55.1-7_amd64.deb
 
 # Download and Unpack
 wget $SWIFT_URL

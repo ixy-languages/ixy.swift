@@ -15,6 +15,7 @@ Currently, only Swift 4.1.3 has been tested.
 Installation on debian-stretch can be done using the setup script:
 
 	./setup/setup-swift-debian-stretch.sh
+	source setup/setup-swift-paths.sh
 
 It is also necessary to setup hugepages:
 
