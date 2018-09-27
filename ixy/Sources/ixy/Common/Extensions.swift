@@ -21,4 +21,3 @@ extension BinaryInteger {
 		return ((self >> bit) & 1) > 0
 	}
 }
-

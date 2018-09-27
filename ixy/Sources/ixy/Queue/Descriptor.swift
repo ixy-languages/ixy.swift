@@ -64,3 +64,9 @@ class Descriptor {
 
 }
 
+extension Descriptor: DebugDump {
+	func dump(_ inset: Int = 0) {
+		let pre = createDumpPrefix(inset)
+		print("\(pre)Descriptor \(queuePointer)")
+	}
+}

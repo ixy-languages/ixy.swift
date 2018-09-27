@@ -11,5 +11,5 @@ guard CommandLine.arguments.count > 1 else {
 
 let pciAddress = CommandLine.arguments[1]
 
-let device = Device(address: pciAddress)
+let device = try Device(address: pciAddress)
 try device.open()

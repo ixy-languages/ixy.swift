@@ -28,7 +28,7 @@ internal class DeviceConfig: File {
 			// Register at 0x08 = [RevID:8][ClassCode:24]
 			// -> read from 0x08 but discard first 8 bits
 			try code = self.read(offset: 0x08)
-			code = (code & 0x00FFFFFF)
+			code = ((code >> 8) & 0xFF_FFFF)
 		} catch {
 			code = 0
 		}
