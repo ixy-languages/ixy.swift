@@ -9,7 +9,7 @@ import Foundation
 
 class Pagemap: File {
 	static var pagesize: Int = {
-		return sysconf(_SC_PAGESIZE)
+		return sysconf(Int32(_SC_PAGESIZE))
 	}()
 
 	init?() {

@@ -35,3 +35,13 @@ internal class DeviceConfig: File {
 		return code
 	}
 }
+
+extension DeviceConfig: CustomStringConvertible {
+	var description: String {
+		let vendor = String(self.vendorID, radix: 16, uppercase: true)
+		let device = String(self.deviceID, radix: 16, uppercase: true)
+		let classC = String(self.classCode, radix: 16, uppercase: true)
+		return "DeviceConfig(vendor=0x\(vendor), device=0x\(device), class=0x\(classC))"
+	}
+}
+
