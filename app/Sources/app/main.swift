@@ -13,3 +13,7 @@ let pciAddress = CommandLine.arguments[1]
 
 let device = try Device(address: pciAddress)
 try device.open()
+
+device.dump()
+
+//SomeTests()

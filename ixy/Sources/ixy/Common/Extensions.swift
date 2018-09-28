@@ -21,3 +21,25 @@ extension BinaryInteger {
 		return ((self >> bit) & 1) > 0
 	}
 }
+
+infix operator ++<: AssignmentPrecedence
+extension Int {
+	/// custom operator to increment a value, resetting it to 0 when it's >= max
+	///
+	/// - Parameters:
+	///   - value: the value to adjust
+	///   - max: the max value, with value < max
+	static func ++<(value: inout Int, max: Int) {
+		value = value + 1
+		if value > max { value = 0 }
+	}
+}
+
+func throwsError(_ block: () throws -> Void) -> Error? {
+	do {
+		try block()
+	} catch  {
+		return error
+	}
+	return nil
+}

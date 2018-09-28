@@ -20,6 +20,21 @@ class DMAMempool {
 		}
 	}
 
+	/// the mempool pointer automatically "free"s an entry when it's released
+	class Pointer {
+		let entry: DMAMempool.Entry
+		let mempool: DMAMempool
+
+		fileprivate init(entry: DMAMempool.Entry, mempool: DMAMempool) {
+			self.entry = entry
+			self.mempool = mempool
+		}
+
+		deinit {
+			mempool.freeEntry(entry: self.entry)
+		}
+	}
+
 	internal let memory: DMAMemory
 	internal let entries: [Entry]
 	internal var availableEntries: [Entry]
@@ -27,7 +42,7 @@ class DMAMempool {
 	init?(memory: UnsafeMutableRawPointer, entrySize: UInt, entryCount: UInt) {
 		guard entryCount > 0 else { print("buffer with 0 pakets not supported"); return nil; }
 		guard let dmaMemory = DMAMemory(virtual: memory) else { return nil; }
-		guard let pagemap = Pagemap() else { return nil; }
+		guard let pagemap = try? Pagemap() else { return nil; }
 
 		self.memory = dmaMemory
 		// create entry wrappers
@@ -43,18 +58,25 @@ class DMAMempool {
 		self.availableEntries = entries
 	}
 
-	func allocEntry() -> Entry? {
+	func getFreePointer() -> Pointer? {
+		guard let entry = self.allocEntry() else { return nil }
+		return Pointer(entry: entry, mempool: self)
+	}
+
+	private func allocEntry() -> Entry? {
 		guard let last = availableEntries.popLast() else {
 			print("no pakets left in buffer")
 			return nil;
 		}
 		last.inUse = true
+		print("[DMAMempool] alloc \(last.pointer.virtual)")
 		return last
 	}
 
-	func freeEntry(entry: Entry) {
+	private func freeEntry(entry: Entry) {
 		entry.inUse = false
 		self.availableEntries.append(entry)
+		print("[DMAMempool] free \(entry.pointer.virtual)")
 	}
 }
 

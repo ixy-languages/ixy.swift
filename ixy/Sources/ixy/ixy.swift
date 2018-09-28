@@ -9,10 +9,11 @@ public struct Ixy {
 
 
 public func SomeTests() {
-	var someInt: Int64 = 42
-	if let memory = DMAMemory(virtual: &someInt) {
-		print("Virt: \(memory.virtual)")
-		print("Phys: \(memory.physical)")
-	}
+//	var someInt: Int64 = 42
+//	if let memory = DMAMemory(virtual: &someInt) {
+//		print("Virt: \(memory.virtual)")
+//		print("Phys: \(memory.physical)")
+//	}
+
 }
 

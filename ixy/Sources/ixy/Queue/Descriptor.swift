@@ -28,40 +28,50 @@ struct ReceiveWriteback {
 
 class Descriptor {
 	internal let queuePointer: UnsafeMutablePointer<Int64>
-	internal var mempoolEntry: DMAMempool.Entry?
-	internal let mempool: DMAMempool
+	internal var packetPointer: DMAMempool.Pointer?
+	internal let packetMempool: DMAMempool
 
 	init(queuePointer: UnsafeMutablePointer<Int64>, mempool: DMAMempool) {
 		self.queuePointer = queuePointer
-		self.mempool = mempool
+		self.packetMempool = mempool
 	}
+}
 
+// MARK: - Receiving
+extension Descriptor {
 	func prepareForReceiving() {
-		guard let entry = self.mempool.allocEntry() else {
+		// allocate new mempool entry if necessary
+		guard self.packetPointer == nil, let packetPointer = self.packetMempool.getFreePointer() else {
 			print("couldn't alloc space for packet")
 			return
 		}
-		self.mempoolEntry = entry
-		queuePointer[0] = Int64(Int(bitPattern: entry.pointer.physical))
+		self.packetPointer = packetPointer
+		queuePointer[0] = Int64(Int(bitPattern: packetPointer.entry.pointer.physical))
 		queuePointer[1] = 0
 	}
 
-	func receivePacket() -> DMAMempool.Entry? {
-		guard let entry = self.mempoolEntry else { return nil; }
+	enum ReceiveResponse {
+		case unknownError
+		case notReady
+		case multipacket
+		case packet(DMAMempool.Pointer)
+	}
+
+	func receivePacket() -> ReceiveResponse {
+		guard let entry = self.packetPointer else { return .unknownError; }
 
 		let status = ReceiveWriteback.Status.from(queuePointer)
 		guard status.contains(.descriptorDone) else {
-			print("packet not ready")
-			return nil
+			return .notReady
 		}
-		guard status.contains(.endOfPacket) else {
-			print("multipacket not supported")
-			return nil
+		guard status.contains(.endOfPacket) == false else {
+			return .multipacket
 		}
 
-		return entry
+		// remove packet buffer from descriptor, the client needs to handle it
+		self.packetPointer = nil
+		return .packet(entry)
 	}
-
 }
 
 extension Descriptor: DebugDump {

@@ -3,9 +3,11 @@ import Foundation
 internal class File {
 	internal var fd: Int32
 	internal var closeOnDealloc: Bool
+	internal var path: String?
 
 	internal enum FileError: Error {
 		case unknownError
+		case internalError
 		case ioError
 		case readError(Int32)
 		case writeError(Int32)
@@ -16,18 +18,16 @@ internal class File {
 		self.closeOnDealloc = closeOnDealloc
 	}
 
-	internal init?(path: String, flags: Int32) {
-		guard let chars = path.cString(using: .utf8) else { return nil; }
+	internal init(path: String, flags: Int32, createMode: mode_t? = nil) throws {
+		guard let chars = path.cString(using: .utf8) else { throw FileError.internalError }
 		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
-		self.fd = open(pathPointer, flags)
+		if let mode = createMode {
+			self.fd = open(pathPointer, flags, mode)
+		} else {
+			self.fd = open(pathPointer, flags)
+		}
 		self.closeOnDealloc = true
-	}
-
-	internal init?(path: String, flags: Int32, createMode: mode_t) {
-		guard let chars = path.cString(using: .utf8) else { return nil; }
-		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
-		self.fd = open(pathPointer, flags, createMode)
-		self.closeOnDealloc = true
+		self.path = path
 	}
 
 	deinit {
@@ -102,6 +102,28 @@ extension File {
 	internal func truncate(to length: off_t = 0) throws {
 		if ftruncate(fd, length) == -1 {
 			throw FileError.writeError(errno)
+		}
+	}
+
+	internal func writeString(_ string: String) {
+		guard let chars = string.cString(using: .utf8) else {
+			print("couldnt convert string")
+			return;
+		}
+		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
+		write(fd, pathPointer, chars.count)
+	}
+
+	subscript<T>(offset: off_t) -> T {
+		get {
+			// TODO: check performance
+			let val: UnsafeMutablePointer<T> = UnsafeMutablePointer.allocate(capacity: 1)
+			pread(fd, val, MemoryLayout<T>.size, offset)
+			return val[0]
+		}
+		set {
+			var val = newValue
+			pwrite(fd, &val, MemoryLayout<T>.size, offset)
 		}
 	}
 }

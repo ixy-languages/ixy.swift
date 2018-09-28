@@ -1,5 +1,5 @@
-SWIFT_PACKAGE="swift-4.2-RELEASE-ubuntu18.04"
-SWIFT_URL="https://swift.org/builds/swift-4.2-release/ubuntu1804/swift-4.2-RELEASE/swift-4.2-RELEASE-ubuntu18.04.tar.gz"
+SWIFT_PACKAGE="swift-4.2-RELEASE-ubuntu16.04"
+SWIFT_URL="https://swift.org/builds/swift-4.2-release/ubuntu1604/swift-4.2-RELEASE/swift-4.2-RELEASE-ubuntu16.04.tar.gz"
 
 PREV_WD="$(pwd)"
 

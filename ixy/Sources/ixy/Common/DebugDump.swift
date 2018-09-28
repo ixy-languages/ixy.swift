@@ -7,14 +7,14 @@
 
 import Foundation
 
-protocol DebugDump {
+public protocol DebugDump {
 	func dump(_ inset: Int)
 
 	func createDumpPrefix(_ inset: Int) -> String
 }
 
 extension DebugDump {
-	func createDumpPrefix(_ inset: Int) -> String {
+	public func createDumpPrefix(_ inset: Int) -> String {
 		return inset > 0 ? String(repeating: " ", count: inset) : ""
 	}
 }
@@ -28,7 +28,7 @@ extension Array: DebugDump where Element : DebugDump {
 		}
 	}
 
-	func dump(_ inset: Int = 0) {
+	public func dump(_ inset: Int = 0) {
 		dump(inset, elementName: "Element")
 	}
 }

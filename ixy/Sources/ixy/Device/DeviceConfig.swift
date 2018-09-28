@@ -8,9 +8,9 @@
 import Foundation
 
 internal class DeviceConfig: File {
-	internal init?(address: String) {
+	internal init(address: String) throws {
 		let path = Constants.pcieBasePath + address + "/config"
-		super.init(path: path, flags: O_RDONLY)
+		try super.init(path: path, flags: O_RDONLY)
 	}
 
 	var vendorID: UInt16 {
