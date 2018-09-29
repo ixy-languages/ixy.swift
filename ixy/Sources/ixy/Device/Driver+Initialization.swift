@@ -7,6 +7,13 @@
 
 import Foundation
 
+// todo: create regex that accepts mask compositions
+let IXGBE_CTRL_RST_MASK: UInt32 = (IXGBE_CTRL_LNK_RST | IXGBE_CTRL_RST)
+let IXGBE_AUTOC_LMS_MASK: UInt32 = (0x7 << IXGBE_AUTOC_LMS_SHIFT)
+let IXGBE_AUTOC_LMS_10G_SERIAL: UInt32 = (0x3 << IXGBE_AUTOC_LMS_SHIFT)
+let IXGBE_AUTOC_10G_XAUI: UInt32 = (0x0 << IXGBE_AUTOC_10G_PMA_PMD_SHIFT)
+
+
 extension Driver {
 	static func mmapResource(address: String) throws -> (UnsafeMutableRawPointer, Int) {
 		let path = Constants.pcieBasePath + address + "/resource0"
@@ -72,6 +79,8 @@ extension Driver {
 
 		self.wait(until: IXGBE_EEC, didSetMask: IXGBE_EEC_ARD)
 		self.wait(until: IXGBE_RDRXCTL, didSetMask: IXGBE_RDRXCTL_DMAIDONE)
+
+		initLink()
 	}
 
 	func initLink() {
@@ -79,5 +88,18 @@ extension Driver {
 		self[IXGBE_AUTOC] = (self[IXGBE_AUTOC] & ~IXGBE_AUTOC_10G_PMA_PMD_MASK) | IXGBE_AUTOC_10G_XAUI
 
 		self[IXGBE_AUTOC] |= IXGBE_AUTOC_AN_RESTART
+	}
+
+	var promiscuousMode: Bool {
+		get {
+			return (self[IXGBE_FCTRL] & (IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE)) > 0
+		}
+		set {
+			if newValue {
+				self[IXGBE_FCTRL] |= IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE
+			} else {
+				self[IXGBE_FCTRL] ^= IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE
+			}
+		}
 	}
 }

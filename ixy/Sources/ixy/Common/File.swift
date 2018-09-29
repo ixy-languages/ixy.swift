@@ -114,15 +114,26 @@ extension File {
 		write(fd, pathPointer, chars.count)
 	}
 
-	subscript<T>(offset: off_t) -> T {
+	subscript<T: BinaryInteger>(offset: off_t) -> T {
 		get {
-			// TODO: check performance
-			let val: UnsafeMutablePointer<T> = UnsafeMutablePointer.allocate(capacity: 1)
-			pread(fd, val, MemoryLayout<T>.size, offset)
-			return val[0]
+			var val: T = 0
+			pread(fd, &val, MemoryLayout<T>.size, offset)
+			return val
 		}
 		set {
 			var val = newValue
+			pwrite(fd, &val, MemoryLayout<T>.size, offset)
+		}
+	}
+
+	subscript<T>(offset: off_t) -> T? {
+		get {
+			var val: T?
+			pread(fd, &val, MemoryLayout<T>.size, offset)
+			return val
+		}
+		set {
+			guard var val = newValue else { return }
 			pwrite(fd, &val, MemoryLayout<T>.size, offset)
 		}
 	}
