@@ -7,13 +7,6 @@
 
 import Foundation
 
-// todo: create regex that accepts mask compositions
-let IXGBE_CTRL_RST_MASK: UInt32 = (IXGBE_CTRL_LNK_RST | IXGBE_CTRL_RST)
-let IXGBE_AUTOC_LMS_MASK: UInt32 = (0x7 << IXGBE_AUTOC_LMS_SHIFT)
-let IXGBE_AUTOC_LMS_10G_SERIAL: UInt32 = (0x3 << IXGBE_AUTOC_LMS_SHIFT)
-let IXGBE_AUTOC_10G_XAUI: UInt32 = (0x0 << IXGBE_AUTOC_10G_PMA_PMD_SHIFT)
-
-
 /// abstraction for the Intel 82599 pci interface
 class Driver {
 	internal let address: String
@@ -38,7 +31,16 @@ class Driver {
 		munmap(self.resource, self.size)
 	}
 
-	
+	func readStats() -> DeviceStats {
+		return DeviceStats(resourceAddress: resource)
+	}
+}
+
+fileprivate extension DeviceStats {
+	init(resourceAddress addr: UnsafeMutableRawPointer) {
+		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
+				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
+	}
 }
 
 extension Driver {

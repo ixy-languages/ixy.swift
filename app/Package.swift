@@ -16,6 +16,7 @@ let package = Package(
         .target(
             name: "app",
             dependencies: ["ixy"]),
+		
         .testTarget(
             name: "appTests",
             dependencies: ["app"]),
