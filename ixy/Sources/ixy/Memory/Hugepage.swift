@@ -14,7 +14,7 @@ struct Hugepage {
 	}
 
 	lazy private(set) var dmaAddress: DMAMemory? = {
-		return DMAMemory(virtual: self.address)
+		return try? DMAMemory(virtual: self.address)
 	}()
 	
 	static let pageId: Atomic<Int> = Atomic(value: 0)

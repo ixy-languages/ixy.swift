@@ -24,6 +24,7 @@ class DMAMempool {
 	class Pointer {
 		let entry: DMAMempool.Entry
 		let mempool: DMAMempool
+		var size: UInt16 = 0
 
 		fileprivate init(entry: DMAMempool.Entry, mempool: DMAMempool) {
 			self.entry = entry
@@ -41,7 +42,7 @@ class DMAMempool {
 
 	init?(memory: UnsafeMutableRawPointer, entrySize: UInt, entryCount: UInt) {
 		guard entryCount > 0 else { print("buffer with 0 pakets not supported"); return nil; }
-		guard let dmaMemory = DMAMemory(virtual: memory) else { return nil; }
+		guard let dmaMemory = try? DMAMemory(virtual: memory) else { return nil; }
 		guard let pagemap = try? Pagemap() else { return nil; }
 
 		self.memory = dmaMemory
@@ -69,7 +70,7 @@ class DMAMempool {
 			return nil;
 		}
 		last.inUse = true
-		print("[DMAMempool] alloc \(last.pointer.virtual)")
+		print("[DMAMempool] alloc \(last.pointer.virtual), left=\(self.availableEntries.count)")
 		return last
 	}
 

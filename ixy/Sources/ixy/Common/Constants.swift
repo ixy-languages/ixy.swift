@@ -23,5 +23,6 @@ struct Constants {
 	struct Queue {
 		internal static let ringEntryCount: UInt = 512
 		internal static let ringEntrySize: UInt = UInt(MemoryLayout<UInt64>.size * 2)
+		internal static let ringSizeBytes: UInt = { return Queue.ringEntryCount * Queue.ringEntrySize} ()
 	}
 }

@@ -12,8 +12,13 @@ guard CommandLine.arguments.count > 1 else {
 let pciAddress = CommandLine.arguments[1]
 
 let device = try Device(address: pciAddress)
-try device.open()
 
 device.dump()
+
+while true {
+	device.testForward()
+	usleep(1 * 1000 * 1000)
+}
+
 
 //SomeTests()

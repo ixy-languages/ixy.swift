@@ -14,24 +14,31 @@ struct ReceiveWriteback {
 		static let descriptorDone = Status(rawValue: (1 << 0))
 		static let endOfPacket = Status(rawValue: (1 << 1))
 
-		static func from(_ pointer: UnsafeMutablePointer<Int64>) -> Status {
+		static func from(_ pointer: UnsafeMutablePointer<UInt64>) -> Status {
+			print("Header: \(String(pointer[0], radix: 16, uppercase: true)) \(String(pointer[1], radix: 16, uppercase: true))")
 			return Status(rawValue: Int8(pointer[1] & 0x03))
 		}
 	}
 
-	static func lengthFrom(_ pointer: UnsafeMutablePointer<Int64>) -> Int16 {
-		return Int16((pointer[1] >> 32) & 0xFFFF)
+	static func lengthFrom(_ pointer: UnsafeMutablePointer<UInt64>) -> UInt16 {
+		return UInt16((pointer[1] >> 32) & 0xFFFF)
+	}
+}
+
+struct TransmitWriteback {
+	static func done(_ pointer: UnsafeMutablePointer<UInt64>) -> Bool {
+		let status64: UInt64 = pointer[1]
+		return status64[32]
 	}
 }
 
 
-
 class Descriptor {
-	internal let queuePointer: UnsafeMutablePointer<Int64>
+	internal let queuePointer: UnsafeMutablePointer<UInt64>
 	internal var packetPointer: DMAMempool.Pointer?
 	internal let packetMempool: DMAMempool
 
-	init(queuePointer: UnsafeMutablePointer<Int64>, mempool: DMAMempool) {
+	init(queuePointer: UnsafeMutablePointer<UInt64>, mempool: DMAMempool) {
 		self.queuePointer = queuePointer
 		self.packetMempool = mempool
 	}
@@ -46,7 +53,7 @@ extension Descriptor {
 			return
 		}
 		self.packetPointer = packetPointer
-		queuePointer[0] = Int64(Int(bitPattern: packetPointer.entry.pointer.physical))
+		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
 		queuePointer[1] = 0
 	}
 
@@ -58,19 +65,48 @@ extension Descriptor {
 	}
 
 	func receivePacket() -> ReceiveResponse {
-		guard let entry = self.packetPointer else { return .unknownError; }
+		guard let entry = self.packetPointer else {
+			print("no packet pointer")
+			return .unknownError;
+		}
 
 		let status = ReceiveWriteback.Status.from(queuePointer)
 		guard status.contains(.descriptorDone) else {
 			return .notReady
 		}
-		guard status.contains(.endOfPacket) == false else {
-			return .multipacket
-		}
 
 		// remove packet buffer from descriptor, the client needs to handle it
 		self.packetPointer = nil
+
+		guard status.contains(.endOfPacket) else {
+			print("multipacket")
+			return .multipacket
+		}
+		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
+		print("packet size: \(entry.size)")
+
 		return .packet(entry)
+	}
+}
+
+extension Descriptor {
+	var transmitted: Bool {
+		return TransmitWriteback.done(queuePointer)
+	}
+
+	func cleanUpTransmitted() {
+		self.queuePointer[0] = 0
+		self.queuePointer[1] = 0
+		self.packetPointer = nil
+	}
+
+	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
+		self.packetPointer = packetPointer
+		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
+		let size: UInt32 = UInt32(packetPointer.size)
+		let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
+		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
+		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
 	}
 }
 

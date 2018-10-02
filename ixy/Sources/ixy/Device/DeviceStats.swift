@@ -20,6 +20,7 @@ struct DeviceStats {
 		}
 	}
 
+
 	var transmitted: LineStats
 	var received: LineStats
 
@@ -51,3 +52,5 @@ func +(_ lhs: DeviceStats.LineStats, rhs: DeviceStats.LineStats) -> DeviceStats.
 func +(_ lhs: DeviceStats, rhs: DeviceStats) -> DeviceStats {
 	return DeviceStats(transmitted: (lhs.transmitted + rhs.transmitted), received: (lhs.received + rhs.received))
 }
+
+

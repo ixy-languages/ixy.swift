@@ -9,6 +9,7 @@ internal class File {
 		case unknownError
 		case internalError
 		case ioError
+		case openError(Int32)
 		case readError(Int32)
 		case writeError(Int32)
 	}
@@ -26,6 +27,7 @@ internal class File {
 		} else {
 			self.fd = open(pathPointer, flags)
 		}
+		guard self.fd >= 0 else { throw FileError.openError(errno) }
 		self.closeOnDealloc = true
 		self.path = path
 	}
@@ -111,7 +113,9 @@ extension File {
 			return;
 		}
 		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
-		write(fd, pathPointer, chars.count)
+		let bytesToWrite = chars.count - 1
+		let bytesWritten = write(fd, pathPointer, bytesToWrite)
+		assert(bytesWritten == bytesToWrite, "write complete string \(errno) \(bytesWritten) \(chars.count): \(chars)")
 	}
 
 	subscript<T: BinaryInteger>(offset: off_t) -> T {

@@ -2,6 +2,17 @@
 public final class ReceiveQueue : Queue {
 	private var availablePackets: [DMAMempool.Pointer] = []
 
+	override func processBatch() {
+		var lastIndex = tailIndex
+		while process(descriptor: descriptors[tailIndex]) {
+			lastIndex = tailIndex
+			tailIndex ++< descriptors.count
+		}
+		if lastIndex != tailIndex {
+			self.driver.update(queue: self, tailIndex: UInt32(lastIndex))
+		}
+	}
+
 	override func process(descriptor: Descriptor) -> Bool {
 		switch descriptor.receivePacket() {
 		case .notReady:
@@ -23,6 +34,16 @@ public final class ReceiveQueue : Queue {
 		let packets = self.availablePackets
 		self.availablePackets = []
 		return packets
+	}
+
+
+	override func start() {
+		print("starting queuue \(self.index)")
+		for descriptor in self.descriptors {
+			descriptor.prepareForReceiving()
+		}
+
+		driver.start(queue: self)
 	}
 }
 
