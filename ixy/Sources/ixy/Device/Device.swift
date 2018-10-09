@@ -4,8 +4,8 @@ public class Device {
 	public let receiveQueueCount: UInt
 	public let transmitQueueCount: UInt
 
-	internal var receiveQueues: [ReceiveQueue] = []
-	internal var transmitQueues: [TransmitQueue] = []
+	public internal(set) var receiveQueues: [ReceiveQueue] = []
+	public internal(set) var transmitQueues: [TransmitQueue] = []
 
 	internal var packetMempool: DMAMempool
 	internal var packetMemoryMap: MemoryMap
@@ -43,17 +43,14 @@ public class Device {
 		let packetCount: UInt = count * Constants.Queue.ringEntryCount
 		let packetMemorySize: UInt = packetCount * Constants.Device.maxPacketSize
 
-		print("allocating packet buffer for \(packetCount) packets (size=\(packetMemorySize))")
+		Log.info("Allocating packet buffer for \(packetCount) packets (size=\(packetMemorySize))", component: .device)
 
 		// get hugepage
 		let packetHugepage = try Hugepage(size: Int(packetMemorySize), requireContiguous: false)
 		let packetMemory: UnsafeMutableRawPointer = packetHugepage.address
 
 		// get physical address
-		guard let packetMempool = DMAMempool(memory: packetMemory, entrySize: Constants.Device.maxPacketSize, entryCount: packetCount) else {
-			throw DeviceError.memoryError
-		}
-
+		let packetMempool = try DMAMempool(memory: packetMemory, entrySize: Constants.Device.maxPacketSize, entryCount: packetCount)
 		return (packetMempool, packetHugepage.memoryMap)
 	}
 
@@ -70,13 +67,16 @@ public class Device {
 		self.transmitQueues.forEach({ $0.start() })
 		self.driver.promiscuousMode = true
 
-		self.driver.waitForLink()
+		try self.driver.waitForLink()
 
-		print("device ready")
+		Log.info("Device Ready", component: .device)
 	}
 
 	public func testRead() {
-		guard let queue = self.receiveQueues.first else { print("no queue"); return }
+		guard let queue = self.receiveQueues.first else {
+			Log.error("no queue", component: .device)
+			return
+		}
 		queue.processBatch()
 
 		let pkts = queue.fetchAvailablePackets()
@@ -91,13 +91,22 @@ public class Device {
 //	}
 
 	public func testForward() {
-		guard let rxQueue = self.receiveQueues.first else { print("no queue"); return }
+		guard let rxQueue = self.receiveQueues.first else {
+			Log.error("no queue", component: .device)
+			return
+		}
 		rxQueue.processBatch()
 
 		let pkts = rxQueue.fetchAvailablePackets()
-		guard pkts.count > 0 else { print("no packets"); return }
+		guard pkts.count > 0 else {
+			Log.debug("no packets", component: .device)
+			return
+		}
 
-		guard let txQueue = self.transmitQueues.first else { print("no queue"); return }
+		guard let txQueue = self.transmitQueues.first else {
+			Log.error("no queue", component: .device)
+			return
+		}
 		txQueue.addPackets(packets: pkts)
 		txQueue.processBatch()
 	}
@@ -106,12 +115,12 @@ public class Device {
 		// try to open device config
 		let config = try DeviceConfig(address: address)
 
-		print("Device Config: \(config)")
+		Log.debug("Device Config: \(config)", component: .device)
 
 		// check vendor
 		let vendor = config.vendorID
 		guard vendor == Constants.Device.vendorID else {
-			print("VendorID \(vendor) not supported.")
+			Log.error("Vendor \(vendor) not supported", component: .device)
 			throw DeviceError.wrongDeviceType
 		}
 	}

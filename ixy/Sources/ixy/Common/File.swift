@@ -109,7 +109,7 @@ extension File {
 
 	internal func writeString(_ string: String) {
 		guard let chars = string.cString(using: .utf8) else {
-			print("couldnt convert string")
+			Log.error("couldn't get c-string from \(string)", component: .file)
 			return;
 		}
 		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)

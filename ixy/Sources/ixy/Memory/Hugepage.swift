@@ -31,7 +31,7 @@ struct Hugepage {
 		defer {
 			if let path = file.path,
 				let err = throwsError({ try FileManager.default.removeItem(atPath: path) }) {
-				print("error deleting hugepage file: \(err)")
+				Log.error("error deleting pagefile \(err)", component: .driver)
 			}
 		}
 
@@ -63,12 +63,4 @@ struct Hugepage {
 		try memoryMap.lock()
 		return memoryMap
 	}
-
-//	static func allocate(size: Int, requireContiguous: Bool = false) -> DMAMemory? {
-//		guard let virtual: UnsafeMutableRawPointer = allocate(size: size, requireContiguous: requireContiguous) else {
-//			return nil;
-//		}
-//		return DMAMemory(virtual: virtual)
-//	}
-
 }

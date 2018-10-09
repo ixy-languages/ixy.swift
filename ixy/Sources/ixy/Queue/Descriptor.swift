@@ -15,7 +15,7 @@ struct ReceiveWriteback {
 		static let endOfPacket = Status(rawValue: (1 << 1))
 
 		static func from(_ pointer: UnsafeMutablePointer<UInt64>) -> Status {
-			print("Header: \(String(pointer[0], radix: 16, uppercase: true)) \(String(pointer[1], radix: 16, uppercase: true))")
+			Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .rx)
 			return Status(rawValue: Int8(pointer[1] & 0x03))
 		}
 	}
@@ -27,6 +27,7 @@ struct ReceiveWriteback {
 
 struct TransmitWriteback {
 	static func done(_ pointer: UnsafeMutablePointer<UInt64>) -> Bool {
+		Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .tx)
 		let status64: UInt64 = pointer[1]
 		return status64[32]
 	}
@@ -49,7 +50,7 @@ extension Descriptor {
 	func prepareForReceiving() {
 		// allocate new mempool entry if necessary
 		guard self.packetPointer == nil, let packetPointer = self.packetMempool.getFreePointer() else {
-			print("couldn't alloc space for packet")
+			Log.warn("couldn't alloc space for packet", component: .rx)
 			return
 		}
 		self.packetPointer = packetPointer
@@ -66,7 +67,7 @@ extension Descriptor {
 
 	func receivePacket() -> ReceiveResponse {
 		guard let entry = self.packetPointer else {
-			print("no packet pointer")
+			Log.error("no packet pointer", component: .rx)
 			return .unknownError;
 		}
 
@@ -79,11 +80,12 @@ extension Descriptor {
 		self.packetPointer = nil
 
 		guard status.contains(.endOfPacket) else {
-			print("multipacket")
+			Log.error("multipacket unsupported", component: .rx)
 			return .multipacket
 		}
 		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
-		print("packet size: \(entry.size)")
+
+		Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
 
 		return .packet(entry)
 	}

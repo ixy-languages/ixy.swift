@@ -11,13 +11,15 @@ import Foundation
 class Driver {
 	internal let address: String
 	private let resource: UnsafeMutableRawPointer
-	private let size: Int
-	private let file: File
+//	private let size: Int
+//	private let file: File
+	private let mmap: MemoryMap
 
 	enum Error: Swift.Error {
 		case unknownError
 		case unbindError
 		case ioError
+		case initializationError
 	}
 
 	init(address: String) throws {
@@ -25,16 +27,11 @@ class Driver {
 		try Driver.removeDriver(address: address)
 		try Driver.enableDMA(address: address)
 
-		let (pointer, size, file) = try Driver.mmapResource(address: address)
-//		let pointer = UnsafeMutableRawPointer.allocate(byteCount: 2097152, alignment: 1)
-//		let size: Int = 2097152
-		self.resource = pointer
-		self.size = size
-		self.file = file
-	}
-
-	deinit {
-		munmap(self.resource, self.size)
+		let mmap = try Driver.mmapResource(address: address)
+		self.mmap = mmap
+		self.resource = mmap.address
+//		self.size = size
+//		self.file = file
 	}
 
 	func readStats() -> DeviceStats {
@@ -50,35 +47,26 @@ fileprivate extension DeviceStats {
 }
 
 extension Driver {
-//	subscript(address: Int) -> UInt32 {
-//		get {
-//			return resource.load(fromByteOffset: address, as: UInt32.self)
-//		}
-//		set {
-//			resource.storeBytes(of: newValue, toByteOffset: address, as: UInt32.self)
-//		}
-//	}
-
 	subscript(address: UInt32) -> UInt32 {
 		get {
 			return resource.load(fromByteOffset: Int(address), as: UInt32.self)
 		}
 		set {
 			resource.storeBytes(of: newValue, toByteOffset: Int(address), as: UInt32.self)
-			print("[driver] setting \(address) to \(newValue)")
+			Log.debug("setting \(address) to \(newValue)", component: .driver)
 		}
 	}
 
 	func wait(until address: UInt32, didClearMask mask: UInt32) {
 		while self[address] & mask != 0 {
-			print("[driver] waiting for flags 0x\(String(mask, radix: 16, uppercase: false)) in register 0x\(String(mask, radix: 16, uppercase: false)) to set")
+			Log.debug("waiting for flags 0x\(String(mask, radix: 16, uppercase: false)) in register 0x\(String(mask, radix: 16, uppercase: false)) to clear", component: .driver)
 			usleep(10000)
 		}
 	}
 
 	func wait(until address: UInt32, didSetMask mask: UInt32) {
 		while self[address] & mask == 0 {
-			print("[driver] waiting for flags 0x\(String(mask, radix: 16, uppercase: false)) in register 0x\(String(mask, radix: 16, uppercase: false)) to set")
+			Log.debug("waiting for flags 0x\(String(mask, radix: 16, uppercase: false)) in register 0x\(String(mask, radix: 16, uppercase: false)) to set", component: .driver)
 			usleep(10000)
 		}
 	}
@@ -88,7 +76,6 @@ extension LinkSpeed {
 	init?(_ value: UInt32) {
 		// check if up
 		guard (value & IXGBE_LINKS_UP) != 0 else { return nil }
-		print("links up \(value | IXGBE_LINKS_SPEED_82599)")
 		switch (value & IXGBE_LINKS_SPEED_82599) {
 		case IXGBE_LINKS_SPEED_100_82599:
 			self = .mbit100

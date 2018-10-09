@@ -2,7 +2,7 @@
 public final class ReceiveQueue : Queue {
 	private var availablePackets: [DMAMempool.Pointer] = []
 
-	override func processBatch() {
+	override public func processBatch() {
 		var lastIndex = tailIndex
 		while process(descriptor: descriptors[tailIndex]) {
 			lastIndex = tailIndex
@@ -30,7 +30,7 @@ public final class ReceiveQueue : Queue {
 		}
 	}
 
-	func fetchAvailablePackets() -> [DMAMempool.Pointer] {
+	public func fetchAvailablePackets() -> [DMAMempool.Pointer] {
 		let packets = self.availablePackets
 		self.availablePackets = []
 		return packets
@@ -38,7 +38,7 @@ public final class ReceiveQueue : Queue {
 
 
 	override func start() {
-		print("starting queuue \(self.index)")
+		Log.debug("starting \(self.index)", component: .rx)
 		for descriptor in self.descriptors {
 			descriptor.prepareForReceiving()
 		}

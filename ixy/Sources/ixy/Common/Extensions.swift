@@ -43,3 +43,13 @@ func throwsError(_ block: () throws -> Void) -> Error? {
 	}
 	return nil
 }
+
+extension BinaryInteger {
+	var pointerString: String {
+		return "0x" + String(self, radix: 16, uppercase: false)
+	}
+
+	var hexString: String {
+		return String(self, radix: 16, uppercase: false)
+	}
+}

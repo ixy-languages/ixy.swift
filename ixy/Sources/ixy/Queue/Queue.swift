@@ -37,7 +37,7 @@ public class Queue {
 		
 	}
 
-	func processBatch() {
+	public func processBatch() {
 		while process(descriptor: descriptors[tailIndex]) {
 			tailIndex ++< descriptors.count
 		}

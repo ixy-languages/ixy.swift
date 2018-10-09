@@ -27,7 +27,7 @@ class Pagemap: File {
 			let physical = UnsafeMutableRawPointer(bitPattern: physicalIntAddress)
 			return physical
 		} catch {
-			print("error: \(error)")
+			Log.error("error for virtual address \(virtual): \(error)", component: .pagemap)
 			return nil
 		}
 	}

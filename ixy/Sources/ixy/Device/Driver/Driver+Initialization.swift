@@ -8,37 +8,25 @@
 import Foundation
 
 extension Driver {
-	static func mmapResource(address: String) throws -> (UnsafeMutableRawPointer, Int, File) {
+	static func mmapResource(address: String) throws -> MemoryMap {
 		let path = Constants.pcieBasePath + address + "/resource0"
 		let file = try File(path: path, flags: O_RDWR)
+		let mmap = try MemoryMap(file: file, size: nil, access: .readwrite, flags: .shared)
 
-		guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-			let size = attributes[FileAttributeKey.size] as? Int else {
-				print("[driver] getting filesize failed \(path)")
-				throw Error.ioError
-		}
+		Log.debug("mmap'ed resource0: \(path)", component: .driver)
 
-		guard let pointer = mmap(nil, size, PROT_READ | PROT_WRITE, MAP_SHARED, file.fd, 0),
-			pointer != MAP_FAILED else {
-				print("[driver] mmap failed: \(errno)")
-				throw Error.ioError
-		}
-
-		print("[driver] mmaped resource0: \(path)")
-
-		return (pointer, size, file)
+		return mmap
 	}
 
 	static func removeDriver(address: String) throws {
 		let path = Constants.pcieBasePath + address + "/driver/unbind"
 		guard let file = try? File(path: path, flags: O_WRONLY) else {
-			print("[driver] could not unlink \(path)")
-//			throw Error.unbindError
+			Log.warn("could not unbind: \(path)", component: .driver)
 			return
 		}
 
 		file.writeString(address)
-		print("[driver] unbound driver")
+		Log.info("unbound driver", component: .driver)
 	}
 
 	static func enableDMA(address: String) throws {
@@ -48,10 +36,7 @@ extension Driver {
 			throw Error.unbindError
 		}
 
-		print("[driver] dma state \(file[4] as UInt16)")
 		file[4] |= (1 << 2) as UInt16;
-		print("[driver] dma state \(file[4] as UInt16)")
-		print("[driver] enabled dma")
 	}
 
 	func resetAndInit() {
@@ -60,7 +45,7 @@ extension Driver {
 	}
 
 	func reset() {
-		print("[device] resetting \(address)")
+		Log.info("resetting \(address)", component: .driver)
 		// section 4.6.3.1 - disable all interrupts
 		self[IXGBE_EIMC] = 0x7FFFFFFF
 
@@ -74,7 +59,7 @@ extension Driver {
 	}
 
 	func initDevice() {
-		print("[device] initializing \(address)")
+		Log.info("initializing \(address)", component: .driver)
 
 		self.wait(until: IXGBE_EEC, didSetMask: IXGBE_EEC_ARD)
 		self.wait(until: IXGBE_RDRXCTL, didSetMask: IXGBE_RDRXCTL_DMAIDONE)
@@ -116,7 +101,7 @@ extension Driver {
 	}
 
 	func initReceive(for queue: ReceiveQueue, atIndex index: Int) {
-		print("[driver] initalizing receive queue \(index)")
+		Log.debug("initializing receive queue \(index)", component: .driver)
 		// enable advanced rx descriptors, we could also get away with legacy descriptors, but they aren't really easier
 		let i = UInt32(index)
 		self[IXGBE_SRRCTL(i)] = (self[IXGBE_SRRCTL(i)] & ~IXGBE_SRRCTL_DESCTYPE_MASK) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF
@@ -157,7 +142,8 @@ extension Driver {
 	}
 
 	func initTransmit(for queue: TransmitQueue, atIndex index: Int) {
-		print("[driver] initalizing transmit queue \(index)")
+		Log.debug("initializing transmit queue \(index)", component: .driver)
+
 		let i = UInt32(index)
 
 		let address: UInt64 = UInt64(Int(bitPattern: queue.address.physical))
@@ -171,8 +157,9 @@ extension Driver {
 		self[IXGBE_TXDCTL(i)] = txdctl
 	}
 
-	func waitForLink() {
-		print("[driver] waiting for link...")
+	func waitForLink() throws {
+		Log.info("waiting for link...", component: .driver)
+
 		var remaining: UInt32 = 30 * 1000000
 		let interval: UInt32 = 10 * 1000
 		var speed: LinkSpeed? = self.linkSpeed
@@ -183,11 +170,8 @@ extension Driver {
 			speed = self.linkSpeed
 		}
 
-		print("[driver] speed: \(speed?.description ?? "unavailable")")
-
-		if speed == nil {
-			exit(1)
-		}
+		guard let safeSpeed = speed else { throw Error.initializationError }
+		Log.info("link speed \(safeSpeed)", component: .driver)
 	}
 
 	var linkSpeed: LinkSpeed? {

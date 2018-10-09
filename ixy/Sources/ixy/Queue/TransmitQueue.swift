@@ -4,11 +4,11 @@ public class TransmitQueue: Queue {
 	internal var remainingPackets: [DMAMempool.Pointer] = []
 
 	override func start() {
-		print("starting transmit queuue \(self.index)")
+		Log.debug("starting \(self.index)", component: .tx)
 		driver.start(queue: self)
 	}
 
-	override func processBatch() {
+	override public func processBatch() {
 		cleanUpOld()
 		transmitPackets()
 	}
@@ -20,11 +20,15 @@ public class TransmitQueue: Queue {
 	}
 
 	private func cleanUp(descriptor: Descriptor) -> Bool {
-		guard headIndex != tailIndex else { print("can't clean up further."); return false }
-		guard descriptor.transmitted else {
-			print("packet was transmitted, cleaning up")
+		guard headIndex != tailIndex else {
+			Log.debug("head = tail. cleanup done", component: .tx)
 			return false
 		}
+		guard descriptor.transmitted else {
+			Log.debug("[\(descriptor.packetPointer?.id ?? -1)] packet not yet transmitted", component: .tx)
+			return false
+		}
+		Log.debug("[\(descriptor.packetPointer?.id ?? -1)] packet was transmitted", component: .tx)
 		descriptor.cleanUpTransmitted()
 		return true
 	}
@@ -37,16 +41,19 @@ public class TransmitQueue: Queue {
 		self.driver.update(queue: self, tailIndex: UInt32(tailIndex))
 	}
 
-	internal func addPackets(packets: [DMAMempool.Pointer]) {
+	public func addPackets(packets: [DMAMempool.Pointer]) {
 		self.remainingPackets.append(contentsOf: packets)
 	}
 
 	private func transmitNext() -> Bool {
 //		guard headIndex != tailIndex else { print("tx queue full \(index)"); return false }
-		guard let packet = self.remainingPackets.popLast() else { print("nothing to send"); return false }
+		guard let packet = self.remainingPackets.popLast() else {
+			Log.debug("no packets to transmit", component: .tx)
+			return false
+		}
 
 		self.descriptors[tailIndex].scheduleForTransmission(packetPointer: packet)
-		print("added packet to tail")
+		Log.debug("[\(packet.id)] added packet to transmit", component: .tx)
 		
 		return true
 	}
