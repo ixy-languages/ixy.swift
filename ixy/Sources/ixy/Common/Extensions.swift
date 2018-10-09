@@ -31,7 +31,7 @@ extension Int {
 	///   - max: the max value, with value < max
 	static func ++<(value: inout Int, max: Int) {
 		value = value + 1
-		if value > max { value = 0 }
+		if value >= max { value = 0 }
 	}
 }
 

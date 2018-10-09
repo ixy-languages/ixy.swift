@@ -36,8 +36,8 @@ public final class Log {
 		case mempool = 	"memory"
 		case pagemap = 	"pgmap"
 		case file = 	"file"
-		case tx = 		"tx"
-		case rx = 		"rx"
+		case tx = 		"tx    "
+		case rx = 		"    rx"
 	}
 
 	public static func log(_ message: @autoclosure () -> String, level: Level = .debug, component: String) {

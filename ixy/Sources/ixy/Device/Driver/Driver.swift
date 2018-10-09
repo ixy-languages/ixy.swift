@@ -43,6 +43,7 @@ fileprivate extension DeviceStats {
 	init(resourceAddress addr: UnsafeMutableRawPointer) {
 		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
 				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
+		Log.debug("Fetched Stats: \(self)", component: .driver)
 	}
 }
 
@@ -76,6 +77,7 @@ extension LinkSpeed {
 	init?(_ value: UInt32) {
 		// check if up
 		guard (value & IXGBE_LINKS_UP) != 0 else { return nil }
+		Log.debug("link up!", component: .driver)
 		switch (value & IXGBE_LINKS_SPEED_82599) {
 		case IXGBE_LINKS_SPEED_100_82599:
 			self = .mbit100

@@ -7,10 +7,10 @@
 
 import Foundation
 
-struct DeviceStats {
-	struct LineStats {
-		var packets: UInt32
-		var bytes: UInt64
+public struct DeviceStats {
+	public struct LineStats {
+		public var packets: UInt32
+		public var bytes: UInt64
 
 		static let zero = LineStats()
 
@@ -21,8 +21,10 @@ struct DeviceStats {
 	}
 
 
-	var transmitted: LineStats
-	var received: LineStats
+	public var transmitted: LineStats
+	public var received: LineStats
+
+	public static let zero = DeviceStats(transmitted: .zero, received: .zero)
 
 	init(transmitted: LineStats = LineStats(), received: LineStats = LineStats()) {
 		self.transmitted = transmitted
@@ -35,22 +37,51 @@ struct DeviceStats {
 	}
 }
 
-func +=(_ lhs: inout DeviceStats.LineStats, rhs: DeviceStats.LineStats) {
+extension DeviceStats.LineStats: CustomStringConvertible {
+	public var description: String {
+		return "(packets=\(packets),bytes=\(bytes))"
+	}
+}
+
+extension DeviceStats: CustomStringConvertible {
+	public var description: String {
+		return "Stats(tx=\(self.transmitted), rx=\(self.received))"
+	}
+}
+
+public func +=(_ lhs: inout DeviceStats.LineStats, rhs: DeviceStats.LineStats) {
 	lhs.packets += rhs.packets
 	lhs.bytes += rhs.bytes
 }
 
-func +=(_ lhs: inout DeviceStats, rhs: DeviceStats) {
+public func +=(_ lhs: inout DeviceStats, rhs: DeviceStats) {
 	lhs.transmitted += rhs.transmitted
 	lhs.received += rhs.received
 }
 
-func +(_ lhs: DeviceStats.LineStats, rhs: DeviceStats.LineStats) -> DeviceStats.LineStats {
+public func -=(_ lhs: inout DeviceStats.LineStats, rhs: DeviceStats.LineStats) {
+	lhs.packets -= rhs.packets
+	lhs.bytes -= rhs.bytes
+}
+
+public func -=(_ lhs: inout DeviceStats, rhs: DeviceStats) {
+	lhs.transmitted -= rhs.transmitted
+	lhs.received -= rhs.received
+}
+
+public func +(_ lhs: DeviceStats.LineStats, rhs: DeviceStats.LineStats) -> DeviceStats.LineStats {
 	return DeviceStats.LineStats(packets: lhs.packets + rhs.packets, bytes: lhs.bytes + rhs.bytes)
 }
 
-func +(_ lhs: DeviceStats, rhs: DeviceStats) -> DeviceStats {
+public func +(_ lhs: DeviceStats, rhs: DeviceStats) -> DeviceStats {
 	return DeviceStats(transmitted: (lhs.transmitted + rhs.transmitted), received: (lhs.received + rhs.received))
 }
 
+public func -(_ lhs: DeviceStats.LineStats, rhs: DeviceStats.LineStats) -> DeviceStats.LineStats {
+	return DeviceStats.LineStats(packets: lhs.packets - rhs.packets, bytes: lhs.bytes - rhs.bytes)
+}
+
+public func -(_ lhs: DeviceStats, rhs: DeviceStats) -> DeviceStats {
+	return DeviceStats(transmitted: (lhs.transmitted - rhs.transmitted), received: (lhs.received - rhs.received))
+}
 

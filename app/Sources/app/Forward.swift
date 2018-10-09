@@ -8,6 +8,8 @@
 import Foundation
 import ixy
 
+
+
 class Forward {
 	let source: Device
 	let sink: Device
@@ -26,17 +28,41 @@ class Forward {
 		self.sink = try Device(address: sinkAddress, receiveQueues: 1, transmitQueues: queueCount)
 	}
 
-	func loop(sleep: Int = 1 * 1000 * 1000) {
-		for idx in 0..<queueCount {
-			let intIdx = Int(idx)
-			let rx = self.source.receiveQueues[intIdx]
-			let tx = self.sink.transmitQueues[intIdx]
+	func process(from: Device, to: Device, queue: Int) {
+		let rx = from.receiveQueues[queue]
+		let tx = to.transmitQueues[queue]
 
-			rx.processBatch()
-			let packets = rx.fetchAvailablePackets()
-			tx.addPackets(packets: packets)
-			tx.processBatch()
+		rx.processBatch()
+		let packets = rx.fetchAvailablePackets()
+		for packet in packets {
+			packet.touch()
 		}
-		usleep(1 * 1000 * 1000)
+		tx.addPackets(packets: packets)
+		tx.processBatch()
+	}
+
+	func loop() {
+		var nextTime: DispatchTime = .now() + .seconds(1)
+		let finalTime: DispatchTime = .now() + .seconds(30)
+
+		while(finalTime > .now()) {
+			for idx in 0..<queueCount {
+				let intIdx = Int(idx)
+
+				process(from: source, to: sink, queue: intIdx)
+				process(from: sink, to: source, queue: intIdx)
+			}
+//			Log.log("Source: \(self.source.fetchStats())", level: .info, component: "app")
+//			Log.log("Sink:   \(self.sink.fetchStats())", level: .info, component: "app")
+//			usleep(1 * 1000 * 1000)
+			let time: DispatchTime = .now()
+			if(time > nextTime) {
+				let statsA = self.source.readAndResetStats()
+				let statsB = self.source.readAndResetStats()
+				Log.log("A \(statsA.formatted(interval: 1.0))", level: .info, component: "app")
+				Log.log("B \(statsB.formatted(interval: 1.0))", level: .info, component: "app")
+				nextTime = .now() + .seconds(1)
+			}
+		}
 	}
 }

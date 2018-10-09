@@ -16,6 +16,7 @@ public final class ReceiveQueue : Queue {
 	override func process(descriptor: Descriptor) -> Bool {
 		switch descriptor.receivePacket() {
 		case .notReady:
+			Log.debug("package not ready", component: .rx)
 			return false
 		case .unknownError, .multipacket:
 			// although there has been an error, in order to keep the queue from blocking

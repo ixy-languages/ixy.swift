@@ -33,7 +33,7 @@ public class Device {
 		self.driver = try Driver(address: address)
 
 		// create packet buffer and assign
-		(self.packetMempool, self.packetMemoryMap) = try Device.createPacketBuffer(count: rxCount + txCount)
+		(self.packetMempool, self.packetMemoryMap) = try Device.createPacketBuffer(count: (rxCount + txCount) * 8)
 
 		try open()
 	}
@@ -123,6 +123,17 @@ public class Device {
 			Log.error("Vendor \(vendor) not supported", component: .device)
 			throw DeviceError.wrongDeviceType
 		}
+	}
+
+	internal var stats: DeviceStats = DeviceStats(transmittedPackets: 0, transmittedBytes: 0, receivedPackets: 0, receivedBytes: 0)
+	public func fetchStats() -> DeviceStats {
+		let newStats = self.driver.readStats()
+		self.stats += newStats
+		return self.stats
+	}
+
+	public func readAndResetStats() -> DeviceStats {
+		return self.driver.readStats()
 	}
 
 	internal func createReceiveQueues() throws {

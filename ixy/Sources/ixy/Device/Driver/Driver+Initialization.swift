@@ -160,7 +160,7 @@ extension Driver {
 	func waitForLink() throws {
 		Log.info("waiting for link...", component: .driver)
 
-		var remaining: UInt32 = 30 * 1000000
+		var remaining: UInt32 = 60 * 1000000
 		let interval: UInt32 = 10 * 1000
 		var speed: LinkSpeed? = self.linkSpeed
 

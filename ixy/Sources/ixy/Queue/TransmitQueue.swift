@@ -14,7 +14,7 @@ public class TransmitQueue: Queue {
 	}
 
 	private func cleanUpOld() {
-		while cleanUp(descriptor: descriptors[tailIndex]) {
+		while cleanUp(descriptor: descriptors[headIndex]) {
 			headIndex ++< descriptors.count
 		}
 	}
@@ -28,7 +28,7 @@ public class TransmitQueue: Queue {
 			Log.debug("[\(descriptor.packetPointer?.id ?? -1)] packet not yet transmitted", component: .tx)
 			return false
 		}
-		Log.debug("[\(descriptor.packetPointer?.id ?? -1)] packet was transmitted", component: .tx)
+//		Log.debug("[\(descriptor.packetPointer?.id ?? -1)] packet was transmitted", component: .tx)
 		descriptor.cleanUpTransmitted()
 		return true
 	}
@@ -46,15 +46,23 @@ public class TransmitQueue: Queue {
 	}
 
 	private func transmitNext() -> Bool {
-//		guard headIndex != tailIndex else { print("tx queue full \(index)"); return false }
-		guard let packet = self.remainingPackets.popLast() else {
+		var nextIndex: Int = tailIndex
+		nextIndex ++< descriptors.count
+
+		guard nextIndex != headIndex else {
+			Log.debug("queue full \(index), discarding packets", component: .tx)
+			self.remainingPackets = []
+			return false
+		}
+		guard self.remainingPackets.count > 0 else {
 			Log.debug("no packets to transmit", component: .tx)
 			return false
 		}
+		let packet = self.remainingPackets.removeFirst()
 
 		self.descriptors[tailIndex].scheduleForTransmission(packetPointer: packet)
 		Log.debug("[\(packet.id)] added packet to transmit", component: .tx)
-		
+
 		return true
 	}
 

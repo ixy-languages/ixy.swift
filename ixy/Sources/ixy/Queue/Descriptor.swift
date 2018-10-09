@@ -15,7 +15,7 @@ struct ReceiveWriteback {
 		static let endOfPacket = Status(rawValue: (1 << 1))
 
 		static func from(_ pointer: UnsafeMutablePointer<UInt64>) -> Status {
-			Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .rx)
+//			Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .rx)
 			return Status(rawValue: Int8(pointer[1] & 0x03))
 		}
 	}
@@ -27,7 +27,7 @@ struct ReceiveWriteback {
 
 struct TransmitWriteback {
 	static func done(_ pointer: UnsafeMutablePointer<UInt64>) -> Bool {
-		Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .tx)
+//		Log.debug("Header: \(pointer[0].hexString) \(pointer[1].hexString)", component: .tx)
 		let status64: UInt64 = pointer[1]
 		return status64[32]
 	}
@@ -51,6 +51,7 @@ extension Descriptor {
 		// allocate new mempool entry if necessary
 		guard self.packetPointer == nil, let packetPointer = self.packetMempool.getFreePointer() else {
 			Log.warn("couldn't alloc space for packet", component: .rx)
+			exit(1)
 			return
 		}
 		self.packetPointer = packetPointer
@@ -85,7 +86,7 @@ extension Descriptor {
 		}
 		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
 
-		Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
+//		Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
 
 		return .packet(entry)
 	}
@@ -93,7 +94,7 @@ extension Descriptor {
 
 extension Descriptor {
 	var transmitted: Bool {
-		return TransmitWriteback.done(queuePointer)
+		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
 	}
 
 	func cleanUpTransmitted() {
@@ -109,6 +110,8 @@ extension Descriptor {
 		let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
 		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
 		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
+//		Log.debug("scheduled \(packetPointer.entry.pointer.physical)", component: .tx)
+//		Log.debug("Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)", component: .tx)
 	}
 }
 

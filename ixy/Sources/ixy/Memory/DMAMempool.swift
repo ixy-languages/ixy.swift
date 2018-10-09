@@ -38,6 +38,12 @@ public class DMAMempool {
 		deinit {
 			mempool.freeEntry(entry: self.entry)
 		}
+
+		public func touch() {
+			let virtual = self.entry.pointer.virtual
+			let newValue: UInt32 = virtual.load(fromByteOffset: 0, as: UInt32.self)
+			virtual.storeBytes(of: newValue, toByteOffset: 0, as: UInt32.self)
+		}
 	}
 
 	enum Error: Swift.Error {
@@ -77,14 +83,14 @@ public class DMAMempool {
 			return nil;
 		}
 		last.inUse = true
-		Log.debug("alloc \(last.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
+		//Log.debug("alloc \(last.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
 		return last
 	}
 
 	private func freeEntry(entry: Entry) {
 		entry.inUse = false
 		self.availableEntries.append(entry)
-		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
+//		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
 	}
 }
 
