@@ -39,8 +39,8 @@ struct Hugepage {
 	}
 
 	private static func adjustedSize(_ size: Int, requireContiguous: Bool) throws -> Int {
-		let adjustedSize = size.roundUpTo(multipleOf: Constants.hugepagePageSize)
-		if requireContiguous && adjustedSize > Constants.hugepagePageSize {
+		let adjustedSize = size.roundUpTo(multipleOf: Constants.Hugepage.pageSize)
+		if requireContiguous && adjustedSize > Constants.Hugepage.pageSize {
 			throw Error.contiguousMultipageNotSupported
 		}
 		return adjustedSize
@@ -50,7 +50,7 @@ struct Hugepage {
 		// synthesize path
 		let pageId = Hugepage.pageId.increment()
 		let pid = getpid()
-		let path = Constants.hugepagePath + "ixy-swift-\(pid)-\(pageId)"
+		let path = Constants.Hugepage.path + "ixy-swift-\(pid)-\(pageId)"
 
 		// open file and adjust page
 		let file = try File(path: path, flags: O_CREAT | O_RDWR, createMode: S_IRWXU)

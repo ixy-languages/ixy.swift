@@ -19,7 +19,8 @@ class Forward {
 
 	init(sourceAddress: String, sinkAddress: String, queueCount: UInt = 1) throws {
 		guard sourceAddress != sinkAddress else { throw Error.sameDevice }
-
+		Log.log("Starting forward from \(sourceAddress) to \(sinkAddress)", level: .info, component: "app")
+		
 		self.queueCount = queueCount
 		self.source = try Device(address: sourceAddress, receiveQueues: queueCount, transmitQueues: 1)
 		self.sink = try Device(address: sinkAddress, receiveQueues: 1, transmitQueues: queueCount)

@@ -1,26 +1,20 @@
 import Foundation
 import ixy
 
+
 ixy.Log.level = .debug
 
 print("Driver Version: \(Ixy.versionString)")
 
-guard CommandLine.arguments.count > 1 else {
+guard CommandLine.arguments.count > 2 else {
 	print("Missing argument!")
-	print("Usage: app [pci-address]")
+	print("Usage: app [source-pci-address] [sink-pci-address]")
 	exit(0)
 }
 
-//let pciAddress = CommandLine.arguments[1]
-//
-//let device = try Device(address: pciAddress)
-//
-//device.dump()
-//
-//while true {
-//	device.testForward()
-//	usleep(1 * 1000 * 1000)
-//}
+let sourceAddress = CommandLine.arguments[1]
+let sinkAddress = CommandLine.arguments[2]
 
+let forward = try Forward(sourceAddress: sourceAddress, sinkAddress: sinkAddress)
 
-//SomeTests()
+forward.loop()

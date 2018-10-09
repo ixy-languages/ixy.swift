@@ -11,9 +11,11 @@ struct Constants {
 	internal static let pcieBasePath: String = "/sys/bus/pci/devices/"
 	internal static let pagemapPath: String = "/proc/self/pagemap"
 
-	internal static let hugepagePath: String = "/mnt/huge/"
-	internal static let hugepageBits: Int = 21
-	internal static let hugepagePageSize: Int = (1 << 21)
+	struct Hugepage {
+		internal static let path: String = "/mnt/huge/"
+		internal static let pageBits: Int = 21
+		internal static let pageSize: Int = (1 << 21)
+	}
 
 	struct Device {
 		internal static let vendorID: UInt16 = 0x8086
