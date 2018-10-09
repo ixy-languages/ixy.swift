@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import c_ixy
 
 struct ReceiveWriteback {
 	struct Status: OptionSet {
@@ -52,7 +53,7 @@ extension Descriptor {
 		guard self.packetPointer == nil, let packetPointer = self.packetMempool.getFreePointer() else {
 			Log.warn("couldn't alloc space for packet", component: .rx)
 			exit(1)
-			return
+			//return
 		}
 		self.packetPointer = packetPointer
 		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
@@ -92,6 +93,10 @@ extension Descriptor {
 	}
 }
 
+func pointerToInt(_ pointer: UnsafeMutableRawPointer) -> UInt64 {
+	return UInt64(Int(bitPattern: pointer))
+}
+
 extension Descriptor {
 	var transmitted: Bool {
 		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
@@ -103,15 +108,22 @@ extension Descriptor {
 		self.packetPointer = nil
 	}
 
+//	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
+//		self.packetPointer = packetPointer
+//		queuePointer[0] = pointerToInt(packetPointer.entry.pointer.physical)//UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
+//		let size: UInt32 = UInt32(packetPointer.size)
+//		//let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
+//		let lower: UInt32 = (0x2B300000 as UInt32 | size)
+////		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
+//		let upper: UInt32 = size << 14
+//		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
+////		Log.debug("scheduled \(packetPointer.entry.pointer.physical)", component: .tx)
+////		Log.debug("Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)", component: .tx)
+//	}
+
 	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
 		self.packetPointer = packetPointer
-		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
-		let size: UInt32 = UInt32(packetPointer.size)
-		let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
-		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
-		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
-//		Log.debug("scheduled \(packetPointer.entry.pointer.physical)", component: .tx)
-//		Log.debug("Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)", component: .tx)
+		c_ixy_tx_setup(queuePointer, packetPointer.size, packetPointer.entry.pointer.physical)
 	}
 }
 

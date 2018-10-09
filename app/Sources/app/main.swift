@@ -1,7 +1,6 @@
 import Foundation
 import ixy
 
-
 ixy.Log.level = .info
 
 print("Driver Version: \(Ixy.versionString)")
