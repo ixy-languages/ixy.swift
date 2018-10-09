@@ -24,3 +24,13 @@ void c_ixy_tx_setup(void *packet, uint16_t size, void *address) {
 	// 	* tcp/udp checksum offloading is more annoying, you have to precalculate the pseudo-header checksum
 	txd->read.olinfo_status = size << IXGBE_ADVTXD_PAYLEN_SHIFT;
 }
+
+bool c_ixy_tx_desc_done(void *desc) {
+	volatile union ixgbe_adv_tx_desc* txd = desc;
+	uint32_t status = txd->wb.status;
+	// hardware sets this flag as soon as it's sent out, we can give back all bufs in the batch back to the mempool
+	if (status & IXGBE_ADVTXD_STAT_DD) {
+		return true;
+	}
+	return false;
+}

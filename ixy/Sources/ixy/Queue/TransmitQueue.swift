@@ -35,9 +35,12 @@ public class TransmitQueue: Queue {
 
 	private func transmitPackets() {
 		guard remainingPackets.isEmpty == false else { return }
-		while transmitNext() {
+		var packetIndex: Int = 0
+		while transmitNext(packetIndex) {
 			tailIndex ++< descriptors.count
+			packetIndex += 1
 		}
+		if packetIndex > 0, self.remainingPackets.count != 0 { self.remainingPackets.removeFirst(packetIndex) }
 		self.driver.update(queue: self, tailIndex: UInt32(tailIndex))
 	}
 
@@ -45,7 +48,7 @@ public class TransmitQueue: Queue {
 		self.remainingPackets.append(contentsOf: packets)
 	}
 
-	private func transmitNext() -> Bool {
+	private func transmitNext(_ packetIndex: Int) -> Bool {
 		var nextIndex: Int = tailIndex
 		nextIndex ++< descriptors.count
 
@@ -54,11 +57,11 @@ public class TransmitQueue: Queue {
 			self.remainingPackets = []
 			return false
 		}
-		guard self.remainingPackets.count > 0 else {
+		guard packetIndex < self.remainingPackets.count else {
 			Log.debug("no packets to transmit", component: .tx)
 			return false
 		}
-		let packet = self.remainingPackets.removeFirst()
+		let packet = self.remainingPackets[packetIndex]
 
 		self.descriptors[tailIndex].scheduleForTransmission(packetPointer: packet)
 		Log.debug("[\(packet.id)] added packet to transmit", component: .tx)

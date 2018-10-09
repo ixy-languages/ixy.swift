@@ -98,8 +98,11 @@ func pointerToInt(_ pointer: UnsafeMutableRawPointer) -> UInt64 {
 }
 
 extension Descriptor {
+//	var transmitted: Bool {
+//		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
+//	}
 	var transmitted: Bool {
-		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
+		return self.packetPointer != nil && c_ixy_tx_desc_done(queuePointer)
 	}
 
 	func cleanUpTransmitted() {
