@@ -11,11 +11,17 @@ extension Driver {
 	internal func start(queue: ReceiveQueue) {
 		let index = UInt32(queue.index)
 		let rxdctl = IXGBE_RXDCTL(index)
+		Log.info("Enabling Queue \(index)", component: .driver)
 		self[rxdctl] |= IXGBE_RXDCTL_ENABLE
 		wait(until: rxdctl, didSetMask: IXGBE_RXDCTL_ENABLE)
 
 		self[IXGBE_RDH(index)] = 0
-		self[IXGBE_RDT(index)] = UInt32(queue.descriptors.count - 1)
+		//self[IXGBE_RDT(index)] = UInt32(queue.descriptors.count - 1)
+		self.update(queue: queue, tailIndex: UInt32(queue.descriptors.count - 1))
+	}
+
+	func getHeadIndex(queue: ReceiveQueue) -> UInt32 {
+		return self[IXGBE_RDH(UInt32(queue.index))]
 	}
 
 	internal func start(queue: TransmitQueue) {
@@ -30,6 +36,8 @@ extension Driver {
 	}
 
 	internal func update(queue: ReceiveQueue, tailIndex: UInt32) {
+		//let head = self[IXGBE_RDH(UInt32(queue.index))]
+		//Log.debug("head: \(head), tail: \(tailIndex)", component: .driver)
 		self[IXGBE_RDT(UInt32(queue.index))] = tailIndex
 	}
 

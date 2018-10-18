@@ -56,7 +56,7 @@ extension Descriptor {
 			//return
 		}
 		self.packetPointer = packetPointer
-		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
+		queuePointer[0] = u64_from_pointer(self.packetPointer?.entry.pointer.physical) //UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
 		queuePointer[1] = 0
 	}
 
@@ -73,21 +73,32 @@ extension Descriptor {
 			return .unknownError;
 		}
 
-		let status = ReceiveWriteback.Status.from(queuePointer)
-		guard status.contains(.descriptorDone) else {
+		//Log.debug("Receive Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)    \(entry.entry.pointer.physical)", component: .rx)
+
+		let status = c_ixy_rx_desc_ready(queuePointer)
+		if status == 0 {
 			return .notReady
 		}
-
-		// remove packet buffer from descriptor, the client needs to handle it
-		self.packetPointer = nil
-
-		guard status.contains(.endOfPacket) else {
-			Log.error("multipacket unsupported", component: .rx)
+		if status == -1 {
 			return .multipacket
 		}
-		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
 
-//		Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
+//		let status = ReceiveWriteback.Status.from(queuePointer)
+//		guard status.contains(.descriptorDone) else {
+//			return .notReady
+//		}
+//
+//		// remove packet buffer from descriptor, the client needs to handle it
+		self.packetPointer = nil
+//
+//		guard status.contains(.endOfPacket) else {
+//			Log.error("multipacket unsupported", component: .rx)
+//			return .multipacket
+//		}
+
+		entry.size = u16_from_u32(c_ixy_rx_desc_size(queuePointer))//ReceiveWriteback.lengthFrom(queuePointer)
+
+		//Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
 
 		return .packet(entry)
 	}
@@ -105,9 +116,17 @@ extension Descriptor {
 		return self.packetPointer != nil && c_ixy_tx_desc_done(queuePointer)
 	}
 
+	internal func cleanUp() {
+		self.queuePointer[0] = 0
+		self.queuePointer[1] = 0
+		self.packetPointer = nil
+	}
+
 	func cleanUpTransmitted() {
 		self.queuePointer[0] = 0
 		self.queuePointer[1] = 0
+		guard let packetPointer = self.packetPointer else { Log.warn("no packet pointer", component: .tx); return }
+		packetPointer.free()
 		self.packetPointer = nil
 	}
 
@@ -126,6 +145,7 @@ extension Descriptor {
 
 	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
 		self.packetPointer = packetPointer
+		assert(queuePointer[0] == 0, "queue pointer not clean!")
 		c_ixy_tx_setup(queuePointer, packetPointer.size, packetPointer.entry.pointer.physical)
 	}
 }

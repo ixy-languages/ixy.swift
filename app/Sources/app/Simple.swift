@@ -8,14 +8,42 @@
 import Foundation
 import ixy
 
+extension DMAMempool.Pointer {
+	func dump() {
+		guard let bytes = self.packetData else {
+			print("No Data!")
+			return
+		}
+
+		var offset: UInt32 = 0
+		var line: String = ""
+		for byte in bytes {
+			if offset % 16 == 0 {
+				if offset > 0 {
+					print(line)
+					line = ""
+				}
+				line += String(format: "%04x", arguments: [offset]) + ":"
+			}
+			if offset % 2 == 0 {
+				line += " "
+			}
+			line += String(format: "%02x", arguments: [byte])
+
+			offset += 1
+		}
+		print(line)
+	}
+}
+
 class Simple {
 	private let device: Device
 	private var stats: DeviceStats
 	private var nextTime: DispatchTime
 
 	init(address: String) throws {
-		self.device = try Device(address: address)
-		self.stats = DeviceStats.zero
+		self.device = try Device(address: address, receiveQueues: 1, transmitQueues: 1)
+		self.stats = device.readAndResetStats()
 		self.nextTime = DispatchTime.now()
 	}
 
@@ -24,10 +52,19 @@ class Simple {
 		while(true) {
 			device.receiveQueues[0].processBatch()
 			let packets = device.receiveQueues[0].fetchAvailablePackets()
+
+			if packets.count > 0 {
+				print("got packets!")
+				for packet in packets {
+					print("Dumping Packet \(packet.packetData?.baseAddress?.debugDescription ?? "???")")
+					packet.dump()
+				}
+			}
 			//Log.log("got \(packets.count) packets", level: .info, component: "app")
 			device.transmitQueues[0].addPackets(packets: packets)
 			device.transmitQueues[0].processBatch()
-//			sleep(1)
+
+			sleep(1)
 
 			let time: DispatchTime = .now()
 			if(time > nextTime) {

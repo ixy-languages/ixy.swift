@@ -35,14 +35,20 @@ public class DMAMempool {
 			self.mempool = mempool
 		}
 
-		deinit {
-			mempool.freeEntry(entry: self.entry)
+		public func free() {
+			self.mempool.freePointer(self)
 		}
 
 		public func touch() {
 			let virtual = self.entry.pointer.virtual
 			let newValue: UInt32 = virtual.load(fromByteOffset: 0, as: UInt32.self)
 			virtual.storeBytes(of: newValue, toByteOffset: 0, as: UInt32.self)
+		}
+
+		public var packetData: UnsafeBufferPointer<UInt8>? {
+			get {
+				return UnsafeBufferPointer<UInt8>(start: self.entry.pointer.virtual.assumingMemoryBound(to: UInt8.self), count: Int(self.size))
+			}
 		}
 	}
 
@@ -51,8 +57,10 @@ public class DMAMempool {
 	}
 
 	internal let memory: DMAMemory
-	internal let entries: [Entry]
-	internal var availableEntries: [Entry]
+	internal var entries: [Pointer] = []
+//	internal let availableEntries: FixedStack<Pointer>
+//	internal var availableEntries: [Unmanaged<Pointer>] = []
+	internal var availableEntries: [Pointer] = []
 
 	init(memory: UnsafeMutableRawPointer, entrySize: UInt, entryCount: UInt) throws {
 		guard entryCount > 0 else {
@@ -62,34 +70,54 @@ public class DMAMempool {
 		let pagemap = try Pagemap()
 
 		self.memory = dmaMemory
+//		self.availableEntries = FixedStack(size: Int(entryCount))
 		// create entry wrappers
 		self.entries = try (0..<entryCount).compactMap {
 			let advanced = memory.advanced(by: Int($0 * entrySize))
 			let dma = try DMAMemory(virtual: advanced, using: pagemap)
-			return Entry(pointer: dma, size: entrySize)
+			let entry = Entry(pointer: dma, size: entrySize)
+			return Pointer(entry: entry, mempool: self)
 		}
-		// each entry is available initially
-		self.availableEntries = entries
+		self.availableEntries = self.entries
+//		self.availableEntries = self.entries.map { return Unmanaged<Pointer>.passUnretained($0)	}
+//		self.availableEntries.initialize(from: self.entries)
 	}
+
+//	func getFreePointer() -> Pointer? {
+//		return self.availableEntries.pop()
+//	}
+//
+//	fileprivate func freePointer(_ pointer: Pointer) {
+//		self.availableEntries.push(pointer)
+//	}
+
+
+//	func getFreePointer() -> Pointer? {
+//		guard self.availableEntries.count > 0 else { return nil }
+//		let pointer = self.availableEntries.removeLast().takeUnretainedValue()
+//		pointer.entry.inUse = true
+//		return pointer
+//	}
+//
+//	fileprivate func freePointer(_ pointer: Pointer) {
+//		pointer.entry.inUse = false
+//		self.availableEntries.append(Unmanaged.passUnretained(pointer))
+//		//Log.info("did free \(pointer.entry.pointer.virtual)", component: .mempool)
+//		//		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
+//	}
+
 
 	func getFreePointer() -> Pointer? {
-		guard let entry = self.allocEntry() else { return nil }
-		return Pointer(entry: entry, mempool: self)
+		guard self.availableEntries.count > 0 else { return nil }
+		let pointer = self.availableEntries.removeLast()
+		pointer.entry.inUse = true
+		return pointer
 	}
 
-	private func allocEntry() -> Entry? {
-		guard let last = availableEntries.popLast() else {
-			Log.error("no entries left in buffer", component: .mempool)
-			return nil;
-		}
-		last.inUse = true
-		//Log.debug("alloc \(last.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
-		return last
-	}
-
-	private func freeEntry(entry: Entry) {
-		entry.inUse = false
-		self.availableEntries.append(entry)
+	fileprivate func freePointer(_ pointer: Pointer) {
+		pointer.entry.inUse = false
+		self.availableEntries.append(pointer)
+		//Log.info("did free \(pointer.entry.pointer.virtual)", component: .mempool)
 //		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
 	}
 }

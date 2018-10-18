@@ -1,7 +1,7 @@
 
 public class Queue {
 	private let memory: MemoryMap
-	private let packageMempool: DMAMempool
+	internal let packageMempool: DMAMempool
 	internal let descriptors: [Descriptor]
 	internal var tailIndex: Int = 0
 	internal let driver: Driver

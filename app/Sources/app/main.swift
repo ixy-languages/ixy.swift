@@ -21,6 +21,20 @@ if args.first == "simple" {
 	} catch {
 		print("error: \(error)")
 	}
+} else if args.first == "ping" {
+	guard args.count > 1 else {
+		print("Missing argument!")
+		print("Usage: app ping [pci-address]")
+		exit(0)
+	}
+	let address = args[2]
+	Log.log("running 'ping' for \(address)", level: .info, component: "app")
+	do {
+		let ping = try PacketGen(address: address)
+		ping.loop()
+	} catch {
+		print("error: \(error)")
+	}
 } else if args.first == "fwd" {
 	guard args.count > 2 else {
 		print("Missing argument!")

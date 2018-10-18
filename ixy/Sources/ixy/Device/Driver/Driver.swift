@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import c_ixy
 
 /// abstraction for the Intel 82599 pci interface
 class Driver {
@@ -41,8 +42,13 @@ class Driver {
 
 fileprivate extension DeviceStats {
 	init(resourceAddress addr: UnsafeMutableRawPointer) {
-		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
-				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
+		let test: UInt32 = addr[Int(IXGBE_RXDGPC)]
+		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: UInt64(test),
+				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: UInt64(dbg_desc_err_count(addr)))
+//				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
+//		self.init(transmittedPackets: addr[Int(IXGBE_TPT)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
+//				  receivedPackets:  addr[Int(IXGBE_TPR)], receivedBytes: addr[Int(IXGBE_GORCL)])RPDC
+
 		Log.debug("Fetched Stats: \(self)", component: .driver)
 	}
 }
