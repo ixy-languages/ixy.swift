@@ -56,7 +56,11 @@ extension Descriptor {
 			//return
 		}
 		self.packetPointer = packetPointer
-		queuePointer[0] = u64_from_pointer(self.packetPointer?.entry.pointer.physical) //UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
+		#if USE_C_INT_CAST
+		queuePointer[0] = c_ixy_u64_from_pointer(self.packetPointer?.entry.pointer.physical)
+		#else
+		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
+		#endif
 		queuePointer[1] = 0
 	}
 
@@ -73,8 +77,8 @@ extension Descriptor {
 			return .unknownError;
 		}
 
-		//Log.debug("Receive Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)    \(entry.entry.pointer.physical)", component: .rx)
-
+		#if USE_C_PACKET_ACCESS
+		// -- USING C PACKET ACCESS --
 		let status = c_ixy_rx_desc_ready(queuePointer)
 		if status == 0 {
 			return .notReady
@@ -82,23 +86,28 @@ extension Descriptor {
 		if status == -1 {
 			return .multipacket
 		}
-
-//		let status = ReceiveWriteback.Status.from(queuePointer)
-//		guard status.contains(.descriptorDone) else {
-//			return .notReady
-//		}
-//
-//		// remove packet buffer from descriptor, the client needs to handle it
 		self.packetPointer = nil
-//
-//		guard status.contains(.endOfPacket) else {
-//			Log.error("multipacket unsupported", component: .rx)
-//			return .multipacket
-//		}
+		#else
+		// -- USING SWIFT PACKET ACCESS --
+		let status = ReceiveWriteback.Status.from(queuePointer)
+		guard status.contains(.descriptorDone) else {
+			return .notReady
+		}
 
-		entry.size = u16_from_u32(c_ixy_rx_desc_size(queuePointer))//ReceiveWriteback.lengthFrom(queuePointer)
+		// remove packet buffer from descriptor, the client needs to handle it
+		self.packetPointer = nil
 
-		//Log.debug("[\(entry.id)] packet size: \(entry.size)", component: .rx)
+		guard status.contains(.endOfPacket) else {
+			Log.error("multipacket unsupported", component: .rx)
+			return .multipacket
+		}
+		#endif
+
+		#if USE_C_INT_CAST
+		entry.size = c_ixy_u16_from_u32(c_ixy_rx_desc_size(queuePointer))
+		#else
+		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
+		#endif
 
 		return .packet(entry)
 	}
@@ -109,12 +118,15 @@ func pointerToInt(_ pointer: UnsafeMutableRawPointer) -> UInt64 {
 }
 
 extension Descriptor {
-//	var transmitted: Bool {
-//		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
-//	}
+	#if USE_C_PACKET_ACCESS
 	var transmitted: Bool {
 		return self.packetPointer != nil && c_ixy_tx_desc_done(queuePointer)
 	}
+	#else
+	var transmitted: Bool {
+		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
+	}
+	#endif
 
 	internal func cleanUp() {
 		self.queuePointer[0] = 0
@@ -130,19 +142,6 @@ extension Descriptor {
 		self.packetPointer = nil
 	}
 
-//	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
-//		self.packetPointer = packetPointer
-//		queuePointer[0] = pointerToInt(packetPointer.entry.pointer.physical)//UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
-//		let size: UInt32 = UInt32(packetPointer.size)
-//		//let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
-//		let lower: UInt32 = (0x2B300000 as UInt32 | size)
-////		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
-//		let upper: UInt32 = size << 14
-//		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
-////		Log.debug("scheduled \(packetPointer.entry.pointer.physical)", component: .tx)
-////		Log.debug("Header: \(queuePointer[0].hexString) \(queuePointer[1].hexString)", component: .tx)
-//	}
-
 	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
 		self.packetPointer = packetPointer
 		assert(queuePointer[0] == 0, "queue pointer not clean!")
@@ -150,9 +149,3 @@ extension Descriptor {
 	}
 }
 
-extension Descriptor: DebugDump {
-	func dump(_ inset: Int = 0) {
-		let pre = createDumpPrefix(inset)
-		print("\(pre)Descriptor \(queuePointer)")
-	}
-}

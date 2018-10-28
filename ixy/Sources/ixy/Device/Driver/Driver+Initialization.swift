@@ -8,8 +8,8 @@
 import Foundation
 
 extension Driver {
-	static func mmapResource(address: String) throws -> MemoryMap {
-		let path = Constants.pcieBasePath + address + "/resource0"
+	static func mmapResource(address: PCIAddress) throws -> MemoryMap {
+		let path = address.path + "/resource0"
 		let file = try File(path: path, flags: O_RDWR)
 		let mmap = try MemoryMap(file: file, size: nil, access: .readwrite, flags: .shared)
 
@@ -18,19 +18,19 @@ extension Driver {
 		return mmap
 	}
 
-	static func removeDriver(address: String) throws {
-		let path = Constants.pcieBasePath + address + "/driver/unbind"
+	static func removeDriver(address: PCIAddress) throws {
+		let path = address.path + "/driver/unbind"
 		guard let file = try? File(path: path, flags: O_WRONLY) else {
 			Log.warn("could not unbind: \(path)", component: .driver)
 			return
 		}
 
-		file.writeString(address)
+		file.writeString(address.description)
 		Log.info("unbound driver", component: .driver)
 	}
 
-	static func enableDMA(address: String) throws {
-		let path = Constants.pcieBasePath + address + "/config"
+	static func enableDMA(address: PCIAddress) throws {
+		let path = address.path + "/config"
 		guard let file = try? File(path: path, flags: O_RDWR) else {
 			print("[driver] could not unlink \(path)")
 			throw Error.unbindError

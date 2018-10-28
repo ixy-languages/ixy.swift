@@ -8,8 +8,8 @@
 import Foundation
 
 internal class DeviceConfig: File {
-	internal init(address: String) throws {
-		let path = Constants.pcieBasePath + address + "/config"
+	internal init(address: PCIAddress) throws {
+		let path = address.path + "/config"
 		try super.init(path: path, flags: O_RDONLY)
 	}
 

@@ -35,6 +35,11 @@ public struct DeviceStats {
 		self.transmitted = LineStats(packets: transmittedPackets, bytes: transmittedBytes)
 		self.received = LineStats(packets: receivedPackets, bytes: receivedBytes)
 	}
+
+	public init() {
+		self.transmitted = LineStats(packets: 10568232, bytes: 676366848)
+		self.received = LineStats(packets: 14894297, bytes: 953235008)
+	}
 }
 
 extension DeviceStats.LineStats: CustomStringConvertible {

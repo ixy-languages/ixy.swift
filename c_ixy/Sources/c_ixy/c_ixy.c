@@ -15,7 +15,7 @@ void c_ixy_test() {
 void c_ixy_tx_setup(void *packet, uint16_t size, void *address) {
 	volatile union ixgbe_adv_tx_desc* txd = packet;
 	// NIC reads from here
-	txd->read.buffer_addr = address;
+	txd->read.buffer_addr = (uintptr_t)address;
 	// always the same flags: one buffer (EOP), advanced data descriptor, CRC offload, data length
 	txd->read.cmd_type_len =
 	IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size;
@@ -36,23 +36,16 @@ bool c_ixy_tx_desc_done(void *desc) {
 	return false;
 }
 
-uint64_t u64_from_pointer(void *pointer) {
+uint64_t c_ixy_u64_from_pointer(void *pointer) {
 	return (uint64_t)pointer;
 }
 
-uint16_t u16_from_u32(uint32_t u32) {
+uint16_t c_ixy_u16_from_u32(uint32_t u32) {
 	return (uint16_t)u32;
 }
 
 static inline uint32_t get_reg32(const uint8_t* addr, int reg) {
 	return *((volatile uint32_t*) (addr + reg));
-}
-
-uint32_t dbg_desc_err_count(void *pointer) {
-	uint32_t cnt = 0;
-//	cnt += get_reg32(pointer, IXGBE_CRCERRS);
-	cnt += get_reg32(pointer, IXGBE_QPRDC(0));
-	return cnt;
 }
 
 int c_ixy_rx_desc_ready(void *desc) {
@@ -111,10 +104,10 @@ static uint16_t calc_ip_checksum(uint8_t* data, uint32_t len) {
 }
 
 
-uint16_t dbg_packet_size() {
+uint16_t c_ixy_dbg_packet_size() {
 	return PKT_SIZE;
 }
-void dbg_fill_packet(void *packet) {
+void c_ixy_dbg_fill_packet(void *packet) {
 	memcpy(packet, pkt_data, sizeof(pkt_data));
 	*(uint16_t*) (packet + 24) = calc_ip_checksum(packet + 14, 20);
 }

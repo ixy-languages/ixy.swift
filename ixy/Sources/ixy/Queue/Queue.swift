@@ -53,12 +53,3 @@ public class Queue {
 		return try self.init(index: index, memory: hugepage.memoryMap, packageMempool: packageMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
-
-extension Queue: DebugDump {
-	public func dump(_ inset: Int = 0) {
-		let pre = createDumpPrefix(inset)
-		print("\(pre)Queue, memory=\(memory), count=\(descriptors.count)")
-//		descriptors.dump(inset + 1, elementName: "Descriptor")
-	}
-}
-

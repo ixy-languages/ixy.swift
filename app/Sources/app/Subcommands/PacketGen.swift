@@ -8,15 +8,23 @@
 import Foundation
 import ixy
 
-class PacketGen {
+class PacketGen: Subcommand {
+	static let usage: String = "[device1] [device2]"
+
 	private let device: Device
 	private var stats: DeviceStats
 	private var nextTime: DispatchTime
 
-	init(address: String) throws {
+	init(address: PCIAddress) throws {
 		self.device = try Device(address: address, receiveQueues: 1, transmitQueues: 1)
 		self.stats = device.readAndResetStats()
 		self.nextTime = DispatchTime.now()
+	}
+
+	required convenience init(arguments: [String]) throws {
+		guard arguments.count >= 1 else { throw SubcommandError.notEnoughArguments }
+		let address = try PCIAddress(from: arguments[0])
+		try self.init(address: address)
 	}
 
 	func loop() {
@@ -25,15 +33,14 @@ class PacketGen {
 			let packets = device.receiveQueues[0].fetchAvailablePackets()
 
 			if packets.count > 0 {
-				print("got \(packets.count) packets!")
+				Log.log("got \(packets.count) packets", level: .info, component: "app")
 			}
-			//Log.log("got \(packets.count) packets", level: .info, component: "app")
+			
 			let tx = device.transmitQueues[0]
 			guard let packet = tx.createDummyPacket() else {
 				fatalError("no packet available")
 			}
-			tx.addPackets(packets: [packet])
-			tx.processBatch()
+			_ = tx.transmit([packet])
 
 			sleep(1)
 		}

@@ -10,10 +10,8 @@ import c_ixy
 
 /// abstraction for the Intel 82599 pci interface
 class Driver {
-	internal let address: String
+	internal let address: PCIAddress
 	private let resource: UnsafeMutableRawPointer
-//	private let size: Int
-//	private let file: File
 	private let mmap: MemoryMap
 
 	enum Error: Swift.Error {
@@ -23,7 +21,7 @@ class Driver {
 		case initializationError
 	}
 
-	init(address: String) throws {
+	init(address: PCIAddress) throws {
 		self.address = address
 		try Driver.removeDriver(address: address)
 		try Driver.enableDMA(address: address)
@@ -31,8 +29,6 @@ class Driver {
 		let mmap = try Driver.mmapResource(address: address)
 		self.mmap = mmap
 		self.resource = mmap.address
-//		self.size = size
-//		self.file = file
 	}
 
 	func readStats() -> DeviceStats {
@@ -42,12 +38,12 @@ class Driver {
 
 fileprivate extension DeviceStats {
 	init(resourceAddress addr: UnsafeMutableRawPointer) {
-		let test: UInt32 = addr[Int(IXGBE_RXDGPC)]
-		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: UInt64(test),
-				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: UInt64(dbg_desc_err_count(addr)))
+//		let test: UInt32 = addr[Int(IXGBE_RXDGPC)]
+//		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: UInt64(test),
+//				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: UInt64(dbg_desc_err_count(addr)))
 //				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
-//		self.init(transmittedPackets: addr[Int(IXGBE_TPT)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
-//				  receivedPackets:  addr[Int(IXGBE_TPR)], receivedBytes: addr[Int(IXGBE_GORCL)])RPDC
+		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
+				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
 
 		Log.debug("Fetched Stats: \(self)", component: .driver)
 	}

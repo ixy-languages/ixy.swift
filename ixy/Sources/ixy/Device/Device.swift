@@ -1,6 +1,6 @@
 
 public class Device {
-	public let address: String
+	public let address: PCIAddress
 	public let receiveQueueCount: UInt
 	public let transmitQueueCount: UInt
 
@@ -19,7 +19,7 @@ public class Device {
 		case memoryError
 	}
 
-	public init(address: String, receiveQueues rxCount: UInt = 1, transmitQueues txCount: UInt = 1) throws {
+	public init(address: PCIAddress, receiveQueues rxCount: UInt = 1, transmitQueues txCount: UInt = 1) throws {
 		// set properties
 		self.address = address
 		self.receiveQueueCount = rxCount
@@ -33,7 +33,7 @@ public class Device {
 		self.driver = try Driver(address: address)
 
 		// create packet buffer and assign
-		(self.packetMempool, self.packetMemoryMap) = try Device.createPacketBuffer(count: (rxCount + txCount) * 8)
+		(self.packetMempool, self.packetMemoryMap) = try Device.createPacketBuffer(count: (rxCount + txCount) * 2)
 
 		try open()
 	}
@@ -84,34 +84,7 @@ public class Device {
 		print("got \(pkts.count): \(pkts)")
 	}
 
-//	public func testWrite(packets: [DMAMempool.Pointer]) {
-//		guard let queue = self.transmitQueues.first else { print("no queue"); return }
-//
-//		queue.processBatch()
-//	}
-
-	public func testForward() {
-		guard let rxQueue = self.receiveQueues.first else {
-			Log.error("no queue", component: .device)
-			return
-		}
-		rxQueue.processBatch()
-
-		let pkts = rxQueue.fetchAvailablePackets()
-		guard pkts.count > 0 else {
-			Log.debug("no packets", component: .device)
-			return
-		}
-
-		guard let txQueue = self.transmitQueues.first else {
-			Log.error("no queue", component: .device)
-			return
-		}
-		txQueue.addPackets(packets: pkts)
-		txQueue.processBatch()
-	}
-
-	private static func checkConfig(address: String) throws {
+	private static func checkConfig(address: PCIAddress) throws {
 		// try to open device config
 		let config = try DeviceConfig(address: address)
 
@@ -148,17 +121,6 @@ public class Device {
 		self.transmitQueues = try (0..<self.transmitQueueCount).map { (Idx) -> TransmitQueue in
 			return try TransmitQueue.withHugepageMemory(index: Idx, packageMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
 		}
-	}
-}
-
-extension Device: DebugDump {
-	public func dump(_ inset: Int = 0) {
-		let pre = createDumpPrefix(inset)
-		print("\(pre)Device \(address)")
-		print("\(pre)Receive Queues [count=\(receiveQueues.count)]")
-		receiveQueues.dump(inset + 1)
-		print("\(pre)Transmit Queues [count=\(transmitQueues.count)]")
-		transmitQueues.dump(inset + 1)
 	}
 }
 

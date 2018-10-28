@@ -3,58 +3,47 @@ import ixy
 
 ixy.Log.level = .info
 
-print("Driver Version: \(Ixy.versionString)")
+#if USE_C_PACKET_ACCESS
+Log.log("Using C packet access", level: .info, component: "app")
+#endif
 
-let args = CommandLine.arguments.dropFirst()
+// drop the first argument (path to executable)
+var args = CommandLine.arguments
+_ = args.removeFirst()
 
-if args.first == "simple" {
-	guard args.count > 1 else {
-		print("Missing argument!")
-		print("Usage: app simple [pci-address]")
-		exit(0)
-	}
-	let address = args[2]
-	Log.log("running 'simple' for \(address)", level: .info, component: "app")
-	do {
-		let simple = try Simple(address: address)
-		simple.loop()
-	} catch {
-		print("error: \(error)")
-	}
-} else if args.first == "ping" {
-	guard args.count > 1 else {
-		print("Missing argument!")
-		print("Usage: app ping [pci-address]")
-		exit(0)
-	}
-	let address = args[2]
-	Log.log("running 'ping' for \(address)", level: .info, component: "app")
-	do {
-		let ping = try PacketGen(address: address)
-		ping.loop()
-	} catch {
-		print("error: \(error)")
-	}
-} else if args.first == "fwd" {
-	guard args.count > 2 else {
-		print("Missing argument!")
-		print("Usage: app fwd [source-pci-address] [sink-pci-address]")
-		exit(0)
-	}
-	let sourceAddress = args[2]
-	let sinkAddress = args[3]
+// get the subcommand string
+let subcommandString = args.removeFirst()
 
-	do {
-		let forward = try Forward(sourceAddress: sourceAddress, sinkAddress: sinkAddress)
-		forward.loop()
-	} catch {
-		print("error: \(error)")
-	}
-} else {
-	print("Missing argument!")
-	print("Usage: app [fwd|simple]")
+// try to match subcommand
+var subcommandType: Subcommand.Type?
+switch subcommandString {
+case "fwd", "forward":
+	subcommandType = Forward.self
+case "simple":
+	subcommandType = Simple.self
+case "ping","pktgen":
+	subcommandType = PacketGen.self
+default:
+	break
 }
 
+// check if subcommand was known
+guard let subcommandType = subcommandType else {
+	Log.log("Unknown command \(subcommandString)", level: .error, component: "app")
+	Log.log("Usage: app [fwd|simple|ping]", level: .error, component: "app")
+	exit(0)
+}
 
-
-
+// initialize the subcommand, run the loop and print encountered errors
+do {
+	let subcommand = try subcommandType.init(arguments: args)
+	subcommand.loop()
+} catch SubcommandError.notEnoughArguments {
+	Log.log("Not enough arguments!", level: .error, component: "app")
+	Log.log("Usage: app \(subcommandString) \(subcommandType.usage)", level: .error, component: "app")
+} catch SubcommandError.argumentError(let err) {
+	Log.log("Invalid argument: \(err)", level: .error, component: "app")
+	Log.log("Usage: app \(subcommandString) \(subcommandType.usage)", level: .error, component: "app")
+} catch {
+	Log.log("Error: \(error)", level: .error, component: "app")
+}

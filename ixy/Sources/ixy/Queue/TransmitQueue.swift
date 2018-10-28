@@ -52,15 +52,11 @@ public class TransmitQueue: Queue {
 		self.driver.update(queue: self, tailIndex: UInt32(tailIndex))
 	}
 
-	public func addPackets(packets: [DMAMempool.Pointer]) {
-		self.remainingPackets.append(contentsOf: packets)
-	}
-
 	public func createDummyPacket() -> DMAMempool.Pointer? {
 		guard let dummy = self.packageMempool.getFreePointer() else { return nil }
-		dummy.size = dbg_packet_size()
+		dummy.size = c_ixy_dbg_packet_size()
 		let ptr = dummy.entry.pointer.virtual
-		dbg_fill_packet(ptr)
+		c_ixy_dbg_fill_packet(ptr)
 		return dummy
 	}
 
@@ -89,7 +85,7 @@ public class TransmitQueue: Queue {
 		return true
 	}
 
-	public func transmit2(_ packets: [DMAMempool.Pointer], freeUnused: Bool = true) -> Int {
+	public func transmit(_ packets: [DMAMempool.Pointer], freeUnused: Bool = true) -> Int {
 		cleanUpOld()
 
 		var nextIndex: Int = tailIndex
@@ -122,23 +118,6 @@ public class TransmitQueue: Queue {
 		}
 
 		return txCount
-//		guard nextIndex != headIndex else {
-//			Log.debug("queue full \(index), discarding packets", component: .tx)
-//			for packet in self.remainingPackets {
-//				packet.free()
-//			}
-//			lostPackets += self.remainingPackets.count
-//			self.remainingPackets = []
-//			return false
-//		}
-//		guard packetIndex < self.remainingPackets.count else {
-//			Log.debug("no packets to transmit", component: .tx)
-//			return false
-//		}
-//		let packet = self.remainingPackets[packetIndex]
-//
-//		self.descriptors[tailIndex].scheduleForTransmission(packetPointer: packet)
-//		Log.debug("[\(packet.id)] added packet to transmit", component: .tx)
 	}
 
 	override func process(descriptor: Descriptor) -> Bool {
