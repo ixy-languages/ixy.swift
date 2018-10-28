@@ -15,7 +15,7 @@ extension Descriptor {
 	}
 	#else
 	var transmitted: Bool {
-		return self.packetPointer != nil && TransmitWriteback.done(queuePointer)
+		return /*self.packetPointer != nil &&*/ TransmitWriteback.done(queuePointer)
 	}
 	#endif
 
@@ -28,7 +28,7 @@ extension Descriptor {
 	func cleanUpTransmitted() {
 		self.queuePointer[0] = 0
 		self.queuePointer[1] = 0
-		guard let packetPointer = self.packetPointer else { Log.warn("No packet pointer", component: .tx); return }
+		guard let packetPointer = self.packetPointer else { Log.warn("No packet pointer", component: .tx); fatalError("oops") }
 		packetPointer.free()
 		self.packetPointer = nil
 	}

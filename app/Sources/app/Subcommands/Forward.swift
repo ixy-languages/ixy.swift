@@ -92,9 +92,9 @@ class Forward: Subcommand {
 					lastTime = .now()
 					nextTime = .now() + .seconds(1)
 				}
-				if time > finalTime {
-					continueLoop = false
-				}
+//				if time > finalTime {
+//					continueLoop = false
+//				}
 				counter = 0
 			}
 		}

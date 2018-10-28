@@ -17,13 +17,13 @@ extension Float {
 	///   - baseUnit: the base unit (bit, byte, etc)
 	///   - steps: step until next magnitude should be used (1024 for byte, 1000 for packets)
 	/// - Returns: the formatted string
-	func formatted(baseUnit: String = "", steps: Float = 1024) -> String {
+	func formatted(baseUnit: String = "", steps: Float = 1000) -> String {
 		var nextMagnitudes = Float.magnitudes
 		var value = self
 		while nextMagnitudes.count > 0 {
 			let mag = nextMagnitudes.removeFirst()
 			if value <= steps {
-				let format = "%4.01f \(mag)\(baseUnit)"
+				let format = "%4.04f \(mag)\(baseUnit)"
 				return String(format: format, value)
 			} else {
 				value /= steps
@@ -50,7 +50,7 @@ extension DeviceStats.LineStats {
 	func formatted(interval: Float) -> String {
 		let (packetsPerSecond, bytesPerSecond) = self.perSecond(interval: interval)
 		let bitsPerSecond = (bytesPerSecond * 8.0) + (packetsPerSecond * 20 * 8)
-		return "\(bitsPerSecond.formatted(baseUnit: "bits/s")), \(packetsPerSecond.formatted(baseUnit: "pkts/s", steps: 1000.0))"
+		return "\(bitsPerSecond.formatted(baseUnit: "bits/s")), \(packetsPerSecond.formatted(baseUnit: "pkts/s"))"
 	}
 
 	/// convert to human readable string with bit and pkts
@@ -58,7 +58,7 @@ extension DeviceStats.LineStats {
 	/// - Returns: the formatted string
 	func formatted() -> String {
 		let bitsPerSecond = (Float(self.bytes) * 8.0) + (Float(self.packets) * 20 * 8)
-		return "\(bitsPerSecond.formatted(baseUnit: "bits")), \(Float(self.packets).formatted(baseUnit: "pkts", steps: 1000.0))"
+		return "\(bitsPerSecond.formatted(baseUnit: "bits")), \(Float(self.packets).formatted(baseUnit: "pkts"))"
 	}
 }
 

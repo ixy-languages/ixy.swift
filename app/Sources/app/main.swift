@@ -10,6 +10,9 @@ Log.log("Using C packet access", level: .info, component: "app")
 #if USE_C_INT_CAST
 Log.log("Using C for integer casting", level: .info, component: "app")
 #endif
+#if USE_BATCH_TX_CLEAN
+Log.log("Using batch TX cleanup", level: .info, component: "app")
+#endif
 
 // drop the first argument (path to executable)
 var args = CommandLine.arguments

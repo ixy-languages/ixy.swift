@@ -11,7 +11,11 @@ public final class TransmitQueue: Queue {
 	///   - freeUnused: if true, packets that can't be added will be automatically freed
 	/// - Returns: the number of added packets
 	public func transmit(_ packets: [DMAMempool.Pointer], freeUnused: Bool = true) -> Int {
-		cleanUpOld()
+		#if USE_BATCH_TX_CLEAN
+		cleanUpBatch()
+		#else
+		cleanUp()
+		#endif
 
 		var nextIndex: Int = tailIndex
 		let oldIndex: Int = tailIndex
@@ -50,9 +54,41 @@ public final class TransmitQueue: Queue {
 		driver.start(queue: self)
 	}
 
-	private func cleanUpOld() {
+	private func cleanUp() {
 		// iterate over descriptors and clean up, adjusting the head index
 		while cleanUp(descriptor: descriptors[headIndex]) {
+			headIndex ++< descriptors.count
+		}
+	}
+
+	private func cleanUpBatch() {
+		while true {
+			var cleanable: Int = tailIndex - headIndex
+			if cleanable < 0 {
+				cleanable = descriptors.count + cleanable
+			}
+			if cleanable < 32 {
+				break
+			}
+			var cleanup_to: Int = headIndex + 32 - 1
+			if cleanup_to >= descriptors.count {
+				cleanup_to -= descriptors.count
+			}
+
+			if descriptors[cleanup_to].transmitted {
+				var i: Int = headIndex
+				while true {
+					descriptors[i].cleanUpTransmitted()
+					if i == cleanup_to {
+						break
+					}
+					i ++< descriptors.count
+				}
+				sentPackets += 32
+			} else {
+				break
+			}
+			headIndex = cleanup_to
 			headIndex ++< descriptors.count
 		}
 	}
