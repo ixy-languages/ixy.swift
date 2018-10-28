@@ -1,5 +1,6 @@
 import Foundation
 
+/// a simple file wrapper class, which uses file descriptors to access the file
 internal class File {
 	internal var fd: Int32
 	internal var closeOnDealloc: Bool
@@ -48,53 +49,12 @@ extension File {
 		}
 	}
 
-	// concrete helpers following
-
-	internal func read(offset: off_t = 0) throws -> Int8 {
-		var val: Int8 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> Int16 {
-		var val: Int16 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> Int32 {
-		var val: Int32 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> Int {
-		var val: Int = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> UInt8 {
-		var val: UInt8 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> UInt16 {
-		var val: UInt16 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> UInt32 {
-		var val: UInt32 = 0
-		try self.read(&val, offset: offset)
-		return val
-	}
-
-	internal func read(offset: off_t = 0) throws -> UInt {
-		var val: UInt = 0
-		try self.read(&val, offset: offset)
+	// using the BinaryInteger type it's possible to initialize a var with value 0 in the body
+	internal func read<T: BinaryInteger>(offset: off_t) throws -> T {
+		var val: T = 0
+		guard pread(fd, &val, MemoryLayout<T>.size, offset) == MemoryLayout<T>.size else {
+			throw FileError.readError(errno)
+		}
 		return val
 	}
 }
@@ -109,7 +69,7 @@ extension File {
 
 	internal func writeString(_ string: String) {
 		guard let chars = string.cString(using: .utf8) else {
-			Log.error("couldn't get c-string from \(string)", component: .file)
+			Log.error("Couldn't get c-string from \(string)", component: .file)
 			return;
 		}
 		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)

@@ -38,10 +38,6 @@ class Driver {
 
 fileprivate extension DeviceStats {
 	init(resourceAddress addr: UnsafeMutableRawPointer) {
-//		let test: UInt32 = addr[Int(IXGBE_RXDGPC)]
-//		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: UInt64(test),
-//				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: UInt64(dbg_desc_err_count(addr)))
-//				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
 		self.init(transmittedPackets: addr[Int(IXGBE_GPTC)], transmittedBytes: addr[Int(IXGBE_GOTCL)],
 				  receivedPackets:  addr[Int(IXGBE_GPRC)], receivedBytes: addr[Int(IXGBE_GORCL)])
 
@@ -79,7 +75,7 @@ extension LinkSpeed {
 	init?(_ value: UInt32) {
 		// check if up
 		guard (value & IXGBE_LINKS_UP) != 0 else { return nil }
-		Log.debug("link up!", component: .driver)
+		Log.debug("Link up!", component: .driver)
 		switch (value & IXGBE_LINKS_SPEED_82599) {
 		case IXGBE_LINKS_SPEED_100_82599:
 			self = .mbit100

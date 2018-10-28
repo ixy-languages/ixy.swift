@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// the constants which can be used to tweak some aspects or adjust it to different linux distros
 struct Constants {
 	internal static let pcieBasePath: String = "/sys/bus/pci/devices/"
 	internal static let pagemapPath: String = "/proc/self/pagemap"

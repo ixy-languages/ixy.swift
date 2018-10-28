@@ -29,11 +29,10 @@ class PacketGen: Subcommand {
 
 	func loop() {
 		while(true) {
-			device.receiveQueues[0].processBatch()
 			let packets = device.receiveQueues[0].fetchAvailablePackets()
 
 			if packets.count > 0 {
-				Log.log("got \(packets.count) packets", level: .info, component: "app")
+				Log.log("Got \(packets.count) packets", level: .info, component: "app")
 			}
 			
 			let tx = device.transmitQueues[0]

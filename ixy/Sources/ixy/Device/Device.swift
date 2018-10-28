@@ -1,4 +1,5 @@
 
+/// the base class for the Intel 82599
 public class Device {
 	public let address: PCIAddress
 	public let receiveQueueCount: UInt
@@ -55,11 +56,12 @@ public class Device {
 	}
 
 	public func open() throws {
+		// perform various steps to open and initialize the device (method names should be self-explanatory)
 		try createReceiveQueues()
 		try createTransmitQueues()
 
 		self.driver.resetAndInit()
-		let _ = self.driver.readStats()
+		let _ = self.driver.readStats() // this resets the device stats
 
 		self.driver.initReceive(queues: self.receiveQueues)
 		self.driver.initTransmit(queues: self.transmitQueues)
@@ -70,18 +72,6 @@ public class Device {
 		try self.driver.waitForLink()
 
 		Log.info("Device Ready", component: .device)
-	}
-
-	public func testRead() {
-		guard let queue = self.receiveQueues.first else {
-			Log.error("no queue", component: .device)
-			return
-		}
-		queue.processBatch()
-
-		let pkts = queue.fetchAvailablePackets()
-		guard pkts.count > 0 else { print("no packets"); return }
-		print("got \(pkts.count): \(pkts)")
 	}
 
 	private static func checkConfig(address: PCIAddress) throws {
@@ -112,14 +102,14 @@ public class Device {
 	internal func createReceiveQueues() throws {
 		let driver = self.driver
 		self.receiveQueues = try (0..<self.receiveQueueCount).map { (Idx) -> ReceiveQueue in
-			return try ReceiveQueue.withHugepageMemory(index: Idx, packageMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
+			return try ReceiveQueue.withHugepageMemory(index: Idx, packetMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
 		}
 	}
 
 	internal func createTransmitQueues() throws {
 		let driver = self.driver
 		self.transmitQueues = try (0..<self.transmitQueueCount).map { (Idx) -> TransmitQueue in
-			return try TransmitQueue.withHugepageMemory(index: Idx, packageMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
+			return try TransmitQueue.withHugepageMemory(index: Idx, packetMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
 		}
 	}
 }

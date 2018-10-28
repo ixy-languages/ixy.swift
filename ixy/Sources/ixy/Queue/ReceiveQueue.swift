@@ -1,11 +1,20 @@
 
 public final class ReceiveQueue : Queue {
 	private var availablePackets: [DMAMempool.Pointer] = []
-	private var headIndex: Int = 0
 
 	public var receivedPackets: Int = 0
 
-	override public func processBatch() {
+	/// fetches available packet from the ring buffer and returns them
+	///
+	/// - Returns: array of packets
+	public func fetchAvailablePackets() -> [DMAMempool.Pointer] {
+		processBatch()
+		let packets = self.availablePackets
+		self.availablePackets = []
+		return packets
+	}
+
+	func processBatch() {
 		var lastIndex = tailIndex
 		let lastRxIndex = tailIndex
 		while process(descriptor: descriptors[tailIndex]) {
@@ -17,10 +26,10 @@ public final class ReceiveQueue : Queue {
 		}
 	}
 
-	override func process(descriptor: Descriptor) -> Bool {
+	func process(descriptor: Descriptor) -> Bool {
 		switch descriptor.receivePacket() {
 		case .notReady:
-			Log.debug("package not ready", component: .rx)
+			Log.debug("Packet not ready", component: .rx)
 			return false
 		case .unknownError, .multipacket:
 			// although there has been an error, in order to keep the queue from blocking
@@ -37,19 +46,11 @@ public final class ReceiveQueue : Queue {
 		}
 	}
 
-	public func fetchAvailablePackets() -> [DMAMempool.Pointer] {
-		let packets = self.availablePackets
-		self.availablePackets = []
-		return packets
-	}
-
-
 	override func start() {
-		Log.debug("starting \(self.index)", component: .rx)
+		Log.debug("Starting \(self.index)", component: .rx)
 		for descriptor in self.descriptors {
 			descriptor.prepareForReceiving()
 		}
-//		self.tailIndex = self.descriptors.count - 1
 		driver.start(queue: self)
 	}
 }

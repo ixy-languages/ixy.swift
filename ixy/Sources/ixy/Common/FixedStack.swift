@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// a generic fixed stack implementation which can be used as a stand in for an array, to check performance
 class FixedStack<T> {
 	var objects: [T?]
 	var top: Int = 0

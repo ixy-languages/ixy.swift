@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// holds a reference to the virtual and physical address, so the pagemap lookup is only necessary once for each address
 struct DMAMemory {
 	let virtual: UnsafeMutableRawPointer
 	let physical: UnsafeMutableRawPointer
@@ -30,6 +31,7 @@ struct DMAMemory {
 
 	static private func convertVirtualToPhysical(virtual: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer? {
 		#if os(OSX)
+		// no pagemap on macosx. only for debugging/compiling the code
 		let mockPhysical = UnsafeMutableRawPointer(bitPattern: Int(bitPattern: virtual) | 0x0F00_0000_0000_0000)
 		return mockPhysical
 		#elseif os(Linux)

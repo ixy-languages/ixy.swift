@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// simple wrapper class based on file for a pci device
 internal class DeviceConfig: File {
 	internal init(address: PCIAddress) throws {
 		let path = address.path + "/config"
@@ -36,6 +37,7 @@ internal class DeviceConfig: File {
 	}
 }
 
+// MARK: - CustomStringConvertible
 extension DeviceConfig: CustomStringConvertible {
 	var description: String {
 		let vendor = String(self.vendorID, radix: 16, uppercase: true)

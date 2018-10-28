@@ -7,6 +7,11 @@
 
 import Foundation
 
+/// Link Speed for the Device
+///
+/// - mbit100: 100Mbit/s
+/// - gbit1: 1Gbit/s
+/// - gbit10: 10Gbit/s
 internal enum LinkSpeed {
 	case mbit100
 	case gbit1

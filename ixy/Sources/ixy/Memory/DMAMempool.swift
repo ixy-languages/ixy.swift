@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// the mempool holds references to multiple entries, which can be 'allocated' for temporary usage and 'freed' when done
 public class DMAMempool {
 	/// use a class to wrap entry data
 	class Entry {
@@ -41,7 +42,8 @@ public class DMAMempool {
 
 		public func touch() {
 			let virtual = self.entry.pointer.virtual
-			let newValue: UInt32 = virtual.load(fromByteOffset: 0, as: UInt32.self)
+			var newValue: UInt32 = virtual.load(fromByteOffset: 0, as: UInt32.self)
+			newValue += 1
 			virtual.storeBytes(of: newValue, toByteOffset: 0, as: UInt32.self)
 		}
 

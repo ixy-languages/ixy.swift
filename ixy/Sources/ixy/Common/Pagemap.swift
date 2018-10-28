@@ -7,6 +7,8 @@
 
 import Foundation
 
+/// simple subclass for the pagemap file with easy initializiation based on Constants.pagemapPath and conversion
+/// from virtual to physical pointer
 class Pagemap: File {
 	static var pagesize: UInt = {
 		return UInt(sysconf(Int32(_SC_PAGESIZE)))
@@ -27,7 +29,7 @@ class Pagemap: File {
 			let physical = UnsafeMutableRawPointer(bitPattern: physicalIntAddress)
 			return physical
 		} catch {
-			Log.error("error for virtual address \(virtual): \(error)", component: .pagemap)
+			Log.error("Error for virtual address \(virtual): \(error)", component: .pagemap)
 			return nil
 		}
 	}

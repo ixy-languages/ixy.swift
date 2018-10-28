@@ -3,8 +3,12 @@ import ixy
 
 ixy.Log.level = .info
 
+// print compile options
 #if USE_C_PACKET_ACCESS
 Log.log("Using C packet access", level: .info, component: "app")
+#endif
+#if USE_C_INT_CAST
+Log.log("Using C for integer casting", level: .info, component: "app")
 #endif
 
 // drop the first argument (path to executable)
@@ -36,6 +40,8 @@ guard let subcommandType = subcommandType else {
 
 // initialize the subcommand, run the loop and print encountered errors
 do {
+	// CORE
+	// here, the subcommand is initialized and looped
 	let subcommand = try subcommandType.init(arguments: args)
 	subcommand.loop()
 } catch SubcommandError.notEnoughArguments {

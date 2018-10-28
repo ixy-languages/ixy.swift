@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// basic logger with debug/info/warn/error levels and some components
 public final class Log {
 	static var enableColors: Bool = true
 	static var componentLength: Int? = 6 {

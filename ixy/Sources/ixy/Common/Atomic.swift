@@ -29,6 +29,9 @@ public final class Atomic<T> {
 		}
 	}
 
+	/// mutate the value suing a block
+	///
+	/// - Parameter transform: the block which can mutate the value
 	public func mutate(_ transform: (inout T) -> Void) {
 		lock.wait()
 		defer { lock.signal() }

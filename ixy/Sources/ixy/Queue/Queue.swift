@@ -1,9 +1,11 @@
 
+/// base class for a queue
 public class Queue {
 	private let memory: MemoryMap
-	internal let packageMempool: DMAMempool
+	internal let packetMempool: DMAMempool
 	internal let descriptors: [Descriptor]
 	internal var tailIndex: Int = 0
+	internal var headIndex: Int = 0
 	internal let driver: Driver
 	internal let index: UInt
 
@@ -14,9 +16,9 @@ public class Queue {
 		case memoryError
 	}
 
-	required init(index: UInt, memory: MemoryMap, packageMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
+	required init(index: UInt, memory: MemoryMap, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
 		self.memory = memory
-		self.packageMempool = packageMempool
+		self.packetMempool = packetMempool
 		self.driver = driver
 		self.index = index
 
@@ -28,7 +30,7 @@ public class Queue {
 		
 		let intDescriptorCount = Int(descriptorCount)
 		self.descriptors = (0..<intDescriptorCount).map { (Idx) -> Descriptor in
-			return Descriptor(queuePointer: queuePointer.advanced(by: Idx * 2), mempool: packageMempool)
+			return Descriptor(queuePointer: queuePointer.advanced(by: Idx * 2), mempool: packetMempool)
 		}
 
 	}
@@ -37,19 +39,9 @@ public class Queue {
 		
 	}
 
-	public func processBatch() {
-		while process(descriptor: descriptors[tailIndex]) {
-			tailIndex ++< descriptors.count
-		}
-	}
-
-	func process(descriptor: Descriptor) -> Bool {
-		return false
-	}
-
-	static func withHugepageMemory(index: UInt, packageMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
 		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
 		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
-		return try self.init(index: index, memory: hugepage.memoryMap, packageMempool: packageMempool, descriptorCount: descriptorCount, driver: driver)
+		return try self.init(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }

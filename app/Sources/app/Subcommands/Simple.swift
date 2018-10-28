@@ -30,11 +30,10 @@ class Simple: Subcommand {
 	func loop() {
 		nextTime = .now() + .seconds(1)
 		while(true) {
-			device.receiveQueues[0].processBatch()
 			let packets = device.receiveQueues[0].fetchAvailablePackets()
 
 			if packets.count > 0 {
-				Log.log("got \(packets.count) packets", level: .info, component: "app")
+				Log.log("Got \(packets.count) packets", level: .info, component: "app")
 				for packet in packets {
 					print("Dumping Packet \(packet.packetData?.baseAddress?.debugDescription ?? "???")")
 					packet.dump()

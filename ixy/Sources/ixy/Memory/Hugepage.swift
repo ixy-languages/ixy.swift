@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// wrapper for a hugepage page with static functions for allocating a page
 struct Hugepage {
 	let memoryMap: MemoryMap
 	var address: UnsafeMutableRawPointer {
@@ -31,7 +32,7 @@ struct Hugepage {
 		defer {
 			if let path = file.path,
 				let err = throwsError({ try FileManager.default.removeItem(atPath: path) }) {
-				Log.error("error deleting pagefile \(err)", component: .driver)
+				Log.error("Error deleting pagefile \(err)", component: .driver)
 			}
 		}
 

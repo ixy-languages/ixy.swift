@@ -22,6 +22,7 @@ extension BinaryInteger {
 	}
 }
 
+// MARK: - custom operator to incement the Int until a given max
 infix operator ++<: AssignmentPrecedence
 extension Int {
 	/// custom operator to increment a value, resetting it to 0 when it's >= max
@@ -35,6 +36,10 @@ extension Int {
 	}
 }
 
+/// simple do/try/catch wrapper that returns the error, if an error occured
+///
+/// - Parameter block: the block which can fail
+/// - Returns: the error, if any
 func throwsError(_ block: () throws -> Void) -> Error? {
 	do {
 		try block()
@@ -44,11 +49,14 @@ func throwsError(_ block: () throws -> Void) -> Error? {
 	return nil
 }
 
+// MARK: - extensions for pretty-printing integers
 public extension BinaryInteger {
+	/// print the integer like a pointer (0xff00aa)
 	public var pointerString: String {
 		return "0x" + String(self, radix: 16, uppercase: false)
 	}
 
+	/// print the integer like a hexadecimal (ff00aa)
 	public var hexString: String {
 		return String(self, radix: 16, uppercase: false)
 	}

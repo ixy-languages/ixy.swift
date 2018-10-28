@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// wrapper for mmap which also uses munmap/munlock un deinit
 internal class MemoryMap {
 	let address: UnsafeMutableRawPointer
 	let size: Int
@@ -86,6 +87,7 @@ extension MemoryMap.Flags {
 	static let file = Flags(rawValue: MAP_FILE)
 	static let shared = Flags(rawValue: MAP_SHARED)
 	#if os(OSX)
+	// no hugetable on osx
 	static let hugetable = Flags(rawValue: 0x00)
 	#else
 	static let hugetable = Flags(rawValue: MAP_HUGETLB)

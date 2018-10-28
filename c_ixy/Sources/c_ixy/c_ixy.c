@@ -8,10 +8,6 @@
 
 #include "ixgbe_type.h"
 
-void c_ixy_test() {
-	printf("Hello!\n");
-}
-
 void c_ixy_tx_setup(void *packet, uint16_t size, void *address) {
 	volatile union ixgbe_adv_tx_desc* txd = packet;
 	// NIC reads from here
@@ -66,7 +62,7 @@ uint32_t c_ixy_rx_desc_size(void *desc_ptr) {
 }
 
 
-// TODO: Delete!
+// !!! This code is used only in the packetgen example !!!
 
 // excluding CRC (offloaded by default)
 #define PKT_SIZE 60

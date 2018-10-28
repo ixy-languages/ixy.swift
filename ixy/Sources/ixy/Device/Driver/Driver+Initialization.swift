@@ -21,18 +21,17 @@ extension Driver {
 	static func removeDriver(address: PCIAddress) throws {
 		let path = address.path + "/driver/unbind"
 		guard let file = try? File(path: path, flags: O_WRONLY) else {
-			Log.warn("could not unbind: \(path)", component: .driver)
+			Log.warn("Could not unbind: \(path)", component: .driver)
 			return
 		}
 
 		file.writeString(address.description)
-		Log.info("unbound driver", component: .driver)
+		Log.info("Did unbind driver", component: .driver)
 	}
 
 	static func enableDMA(address: PCIAddress) throws {
 		let path = address.path + "/config"
 		guard let file = try? File(path: path, flags: O_RDWR) else {
-			print("[driver] could not unlink \(path)")
 			throw Error.unbindError
 		}
 
@@ -45,7 +44,7 @@ extension Driver {
 	}
 
 	func reset() {
-		Log.info("resetting \(address)", component: .driver)
+		Log.info("Resetting \(address)", component: .driver)
 		// section 4.6.3.1 - disable all interrupts
 		self[IXGBE_EIMC] = 0x7FFFFFFF
 
@@ -59,7 +58,7 @@ extension Driver {
 	}
 
 	func initDevice() {
-		Log.info("initializing \(address)", component: .driver)
+		Log.info("Initializing \(address)", component: .driver)
 
 		self.wait(until: IXGBE_EEC, didSetMask: IXGBE_EEC_ARD)
 		self.wait(until: IXGBE_RDRXCTL, didSetMask: IXGBE_RDRXCTL_DMAIDONE)
@@ -101,7 +100,7 @@ extension Driver {
 	}
 
 	func initReceive(for queue: ReceiveQueue, atIndex index: Int) {
-		Log.debug("initializing receive queue \(index)", component: .driver)
+		Log.debug("Initializing receive queue \(index)", component: .driver)
 		// enable advanced rx descriptors, we could also get away with legacy descriptors, but they aren't really easier
 		let i = UInt32(index)
 		self[IXGBE_SRRCTL(i)] = (self[IXGBE_SRRCTL(i)] & ~IXGBE_SRRCTL_DESCTYPE_MASK) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF
@@ -142,7 +141,7 @@ extension Driver {
 	}
 
 	func initTransmit(for queue: TransmitQueue, atIndex index: Int) {
-		Log.debug("initializing transmit queue \(index)", component: .driver)
+		Log.debug("Initializing transmit queue \(index)", component: .driver)
 
 		let i = UInt32(index)
 
@@ -158,7 +157,7 @@ extension Driver {
 	}
 
 	func waitForLink() throws {
-		Log.info("waiting for link...", component: .driver)
+		Log.info("Waiting for link...", component: .driver)
 
 		var remaining: UInt32 = 60 * 1000000
 		let interval: UInt32 = 10 * 1000
@@ -171,7 +170,7 @@ extension Driver {
 		}
 
 		guard let safeSpeed = speed else { throw Error.initializationError }
-		Log.info("link speed \(safeSpeed)", component: .driver)
+		Log.info("Link speed \(safeSpeed)", component: .driver)
 	}
 
 	var linkSpeed: LinkSpeed? {

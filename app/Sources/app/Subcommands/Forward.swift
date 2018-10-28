@@ -22,32 +22,44 @@ class Forward: Subcommand {
 		case sameDevice
 	}
 
-	init(device1Address: PCIAddress, device2Address: PCIAddress,
-		 receiveQueueCount: UInt = 1, transmitQueueCount: UInt = 1) throws {
+	init(device1Address: PCIAddress, device2Address: PCIAddress) throws {
+		// check if it's the same device
 		guard device1Address != device2Address else { throw Error.sameDevice }
+
 		Log.log("Starting forward from \(device1Address) to \(device2Address)", level: .info, component: "app")
-		
-		self.device1 = try Device(address: device1Address, receiveQueues: receiveQueueCount, transmitQueues: transmitQueueCount)
-		self.device2 = try Device(address: device2Address, receiveQueues: receiveQueueCount, transmitQueues: transmitQueueCount)
+
+		// init devices
+		self.device1 = try Device(address: device1Address, receiveQueues: 1, transmitQueues: 1)
+		self.device2 = try Device(address: device2Address, receiveQueues: 1, transmitQueues: 1)
 	}
 
+	// Subcommand init implementation
 	required convenience init(arguments: [String]) throws {
 		guard arguments.count >= 2 else { throw SubcommandError.notEnoughArguments }
+
+		// parse addresses and init self
 		let device1Address = try PCIAddress(from: arguments[0])
 		let device2Address = try PCIAddress(from: arguments[1])
 		try self.init(device1Address: device1Address, device2Address: device2Address)
 	}
 
-	func process(from: Device, to: Device, queue: Int) {
+	// process/forward from -> to device using a specific queue (currently the queue is always 0)
+	private func process(from: Device, to: Device, queue: Int) {
+		// get queues
 		let rx = from.receiveQueues[queue]
 		let tx = to.transmitQueues[queue]
 
-		rx.processBatch()
+		// receive packets
 		let packets = rx.fetchAvailablePackets()
 		for packet in packets {
+			// touch each packet
 			packet.touch()
 		}
+
+		// transmit packets
 		let sentPackets = tx.transmit(packets, freeUnused: true)
+
+		// keep track of lost packets due if not enough tx descriptors are available
 		lost += (packets.count - sentPackets)
 	}
 
@@ -55,24 +67,35 @@ class Forward: Subcommand {
 		var nextTime: DispatchTime = .now() + .seconds(1)
 		var lastTime: DispatchTime = .now()
 		let finalTime: DispatchTime = .now() + .seconds(10)
+		var counter: UInt = 0
+		var continueLoop: Bool = true
 
-		while(finalTime > .now()) {
+		while continueLoop {
+			// forward the packets
 			process(from: device1, to: device2, queue: 0)
 			process(from: device2, to: device1, queue: 0)
 
-			let time: DispatchTime = .now()
-			if(time > nextTime) {
-				let stats1 = self.device1.readAndResetStats()
-				overallStats1 += stats1
-				let stats2 = self.device2.readAndResetStats()
-				overallStats2 += stats2
+			// check if printing is necessary
+			counter += 1
+			if(counter > 0xFFF) {
+				let time: DispatchTime = .now()
+				if(time > nextTime) {
+					let stats1 = self.device1.readAndResetStats()
+					overallStats1 += stats1
+					let stats2 = self.device2.readAndResetStats()
+					overallStats2 += stats2
 
-				let diff: Float = Float(time.uptimeNanoseconds - lastTime.uptimeNanoseconds) / (1_000_000_000 as Float)
-				Log.log("[1]: \(stats1.formatted(interval: diff))", level: .info, component: "app")
-				Log.log("[2]: \(stats2.formatted(interval: diff))", level: .info, component: "app")
+					let diff: Float = Float(time.uptimeNanoseconds - lastTime.uptimeNanoseconds) / (1_000_000_000 as Float)
+					Log.log("[1]: \(stats1.formatted(interval: diff))", level: .info, component: "app")
+					Log.log("[2]: \(stats2.formatted(interval: diff))", level: .info, component: "app")
 
-				lastTime = .now()
-				nextTime = .now() + .seconds(1)
+					lastTime = .now()
+					nextTime = .now() + .seconds(1)
+				}
+				if time > finalTime {
+					continueLoop = false
+				}
+				counter = 0
 			}
 		}
 		Log.log("--- Overall ---", level: .info, component: "app")

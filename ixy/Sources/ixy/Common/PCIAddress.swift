@@ -10,6 +10,7 @@ import Foundation
 // taken from /usr/include/linux/pci.h
 // and https://wiki.xen.org/wiki/Bus:Device.Function_(BDF)_Notation
 
+/// struct for a pci address
 public struct PCIAddress {
 	let domain: UInt16
 	let bus: UInt8
@@ -29,8 +30,15 @@ public struct PCIAddress {
 	}
 }
 
+// MARK: - Extension for parsing from a string
 extension PCIAddress {
 	public init(from: String) throws {
+		// XXXX:BB:DD.F
+		// X = Domain, optional
+		// B = Bus, required
+		// D = Device, required
+		// F = Function, required
+		
 		var components = from.components(separatedBy: ":")
 		guard components.count >= 2, components.count <= 3 else { throw ParseError.invalidComponentCount }
 		var domain: UInt16 = 0
@@ -59,18 +67,23 @@ extension PCIAddress {
 
 		self.init(domain: domain, bus: bus, device: device, function: function)
 	}
+}
 
+// MARK: - Extension for getting the full path
+extension PCIAddress {
 	internal var path: String {
 		return Constants.pcieBasePath + self.description
 	}
 }
 
+// MARK: - CustomStringConvertible
 extension PCIAddress: CustomStringConvertible {
 	public var description: String {
 		return String(format: "%04x:%02x:%02x.%01x", arguments: [domain, bus, device, function])
 	}
 }
 
+// MARK: - Equatable
 extension PCIAddress: Equatable {}
 
 public func ==(lhs: PCIAddress, rhs: PCIAddress) -> Bool {

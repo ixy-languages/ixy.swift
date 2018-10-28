@@ -7,7 +7,9 @@
 
 import Foundation
 
+/// small struct for the device stats
 public struct DeviceStats {
+	/// small substruct for the stats for a line (RX/TX)
 	public struct LineStats {
 		public var packets: UInt32
 		public var bytes: UInt64
@@ -42,6 +44,7 @@ public struct DeviceStats {
 	}
 }
 
+// MARK: - CustomStringConvertible
 extension DeviceStats.LineStats: CustomStringConvertible {
 	public var description: String {
 		return "(packets=\(packets),bytes=\(bytes))"
@@ -53,6 +56,8 @@ extension DeviceStats: CustomStringConvertible {
 		return "Stats(tx=\(self.transmitted), rx=\(self.received))"
 	}
 }
+
+// MARK: - Basic Arithmetic Operations
 
 public func +=(_ lhs: inout DeviceStats.LineStats, rhs: DeviceStats.LineStats) {
 	lhs.packets += rhs.packets
