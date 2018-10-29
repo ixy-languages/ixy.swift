@@ -53,6 +53,12 @@ extension DeviceStats.LineStats {
 		return "\(bitsPerSecond.formatted(baseUnit: "bits/s")), \(packetsPerSecond.formatted(baseUnit: "pkts/s"))"
 	}
 
+	func c_ixy_format(interval: Float) -> String {
+		let (packetsPerSecond, bytesPerSecond) = self.perSecond(interval: interval)
+		let bitsPerSecond = (bytesPerSecond * 8.0) + (packetsPerSecond * 20 * 8)
+		return String(format: "%f Mbit/s %.2f Mpps", arguments: [(bitsPerSecond / 1000000), (packetsPerSecond / 1000000)])
+	}
+
 	/// convert to human readable string with bit and pkts
 	///
 	/// - Returns: the formatted string

@@ -2,6 +2,7 @@ import Foundation
 import ixy
 
 ixy.Log.level = .info
+ixy.Log.enableColors = false
 
 // print compile options
 #if USE_C_PACKET_ACCESS

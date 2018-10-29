@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import c_ixy
 
 // MARK: - Receiving
 extension Descriptor {

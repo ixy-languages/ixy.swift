@@ -8,6 +8,12 @@
 import Foundation
 import ixy
 
+#if os(Linux)
+import Glibc
+#else
+import Darwin.C
+#endif
+
 class Forward: Subcommand {
 	static let usage: String = "[device1] [device2]"
 
@@ -69,6 +75,8 @@ class Forward: Subcommand {
 		let finalTime: DispatchTime = .now() + .seconds(10)
 		var counter: UInt = 0
 		var continueLoop: Bool = true
+		let device1String: String = "\(device1.address)"
+		let device2String: String = "\(device1.address)"
 
 		while continueLoop {
 			// forward the packets
@@ -86,15 +94,22 @@ class Forward: Subcommand {
 					overallStats2 += stats2
 
 					let diff: Float = Float(time.uptimeNanoseconds - lastTime.uptimeNanoseconds) / (1_000_000_000 as Float)
-					Log.log("[1]: \(stats1.formatted(interval: diff))", level: .info, component: "app")
-					Log.log("[2]: \(stats2.formatted(interval: diff))", level: .info, component: "app")
+//					Log.log("[1]: \(stats1.formatted(interval: diff))", level: .info, component: "app")
+//					Log.log("[2]: \(stats2.formatted(interval: diff))", level: .info, component: "app")
+					print("[\(device1String)] RX: \(stats1.received.c_ixy_format(interval: diff))")
+					print("[\(device1String)] TX: \(stats1.transmitted.c_ixy_format(interval: diff))")
+					print("[\(device2String)] RX: \(stats2.received.c_ixy_format(interval: diff))")
+					print("[\(device2String)] TX: \(stats2.transmitted.c_ixy_format(interval: diff))")
+
+					fflush(stdout)
+
 
 					lastTime = .now()
 					nextTime = .now() + .seconds(1)
 				}
-//				if time > finalTime {
-//					continueLoop = false
-//				}
+				if time > finalTime {
+					continueLoop = false
+				}
 				counter = 0
 			}
 		}
