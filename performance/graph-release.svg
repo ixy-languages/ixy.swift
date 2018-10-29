@@ -1,0 +1,942 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="454" onload="init(evt)" viewBox="0 0 1200 454" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs >
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="454.0" fill="url(#background)"  />
+<text text-anchor="middle" x="600.00" y="24" font-size="17" font-family="Verdana" fill="rgb(0,0,0)"  >Flame Graph</text>
+<text text-anchor="" x="10.00" y="437" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="details" > </text>
+<text text-anchor="" x="10.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer" >Reset Zoom</text>
+<text text-anchor="" x="1090.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer" >Search</text>
+<text text-anchor="" x="1090.00" y="437" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="matched" > </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release (209 samples, 0.18%)</title><rect x="72.9" y="293" width="2.1" height="15.0" fill="rgb(228,0,12)" rx="2" ry="2" />
+<text text-anchor="" x="75.92" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain@plt (216 samples, 0.19%)</title><rect x="1186.4" y="293" width="2.2" height="15.0" fill="rgb(219,81,11)" rx="2" ry="2" />
+<text text-anchor="" x="1189.43" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>outlined consume of ixy.Descriptor.ReceiveResponse (191 samples, 0.16%)</title><rect x="786.1" y="261" width="2.0" height="15.0" fill="rgb(230,152,14)" rx="2" ry="2" />
+<text text-anchor="" x="789.12" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_dealloc (22 samples, 0.02%)</title><rect x="768.5" y="229" width="0.2" height="15.0" fill="rgb(227,205,11)" rx="2" ry="2" />
+<text text-anchor="" x="771.48" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>load_elf_binary (12 samples, 0.01%)</title><rect x="1189.9" y="245" width="0.1" height="15.0" fill="rgb(208,119,19)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release (327 samples, 0.28%)</title><rect x="1155.8" y="261" width="3.3" height="15.0" fill="rgb(220,88,20)" rx="2" ry="2" />
+<text text-anchor="" x="1158.80" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #4 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (15 samples, 0.01%)</title><rect x="1144.6" y="229" width="0.2" height="15.0" fill="rgb(224,224,31)" rx="2" ry="2" />
+<text text-anchor="" x="1147.60" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Descriptor.receivePacket() -&gt; ixy.Descriptor.ReceiveResponse (863 samples, 0.74%)</title><rect x="775.2" y="245" width="8.7" height="15.0" fill="rgb(250,66,17)" rx="2" ry="2" />
+<text text-anchor="" x="778.19" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain (239 samples, 0.21%)</title><rect x="1184.0" y="293" width="2.4" height="15.0" fill="rgb(211,160,34)" rx="2" ry="2" />
+<text text-anchor="" x="1187.00" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release (759 samples, 0.65%)</title><rect x="797.9" y="261" width="7.7" height="15.0" fill="rgb(238,151,12)" rx="2" ry="2" />
+<text text-anchor="" x="800.90" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_pread64 (76 samples, 0.07%)</title><rect x="18.7" y="181" width="0.7" height="15.0" fill="rgb(225,77,25)" rx="2" ry="2" />
+<text text-anchor="" x="21.67" y="191.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>malloc (22 samples, 0.02%)</title><rect x="772.9" y="229" width="0.2" height="15.0" fill="rgb(218,135,19)" rx="2" ry="2" />
+<text text-anchor="" x="775.91" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__GI___libc_pread64 (91 samples, 0.08%)</title><rect x="18.6" y="229" width="0.9" height="15.0" fill="rgb(247,78,1)" rx="2" ry="2" />
+<text text-anchor="" x="21.57" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_arrayInitWithCopy (27 samples, 0.02%)</title><rect x="774.4" y="229" width="0.2" height="15.0" fill="rgb(232,77,6)" rx="2" ry="2" />
+<text text-anchor="" x="777.36" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>static ixy.Queue.withHugepageMemory(index: Swift.UInt, packetMempool: ixy.DMAMempool, descriptorCount: Swift.UInt, driver: ixy.Driver) throws -&gt; Self (11 samples, 0.01%)</title><rect x="19.8" y="245" width="0.1" height="15.0" fill="rgb(244,99,46)" rx="2" ry="2" />
+<text text-anchor="" x="22.81" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool (81 samples, 0.07%)</title><rect x="1144.1" y="245" width="0.8" height="15.0" fill="rgb(214,127,26)" rx="2" ry="2" />
+<text text-anchor="" x="1147.07" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (144 samples, 0.12%)</title><rect x="768.7" y="229" width="1.5" height="15.0" fill="rgb(241,197,40)" rx="2" ry="2" />
+<text text-anchor="" x="771.70" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>mmput (10 samples, 0.01%)</title><rect x="1188.9" y="293" width="0.1" height="15.0" fill="rgb(244,223,32)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>search_binary_handler (12 samples, 0.01%)</title><rect x="1189.9" y="293" width="0.1" height="15.0" fill="rgb(215,7,21)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (10,001 samples, 8.60%)</title><rect x="210.4" y="277" width="101.5" height="15.0" fill="rgb(251,118,11)" rx="2" ry="2" />
+<text text-anchor="" x="213.43" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift_relea..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_deallocClassInstance (18 samples, 0.02%)</title><rect x="774.6" y="229" width="0.2" height="15.0" fill="rgb(215,33,37)" rx="2" ry="2" />
+<text text-anchor="" x="777.64" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__tls_get_addr@plt (160 samples, 0.14%)</title><rect x="1087.9" y="229" width="1.6" height="15.0" fill="rgb(225,33,32)" rx="2" ry="2" />
+<text text-anchor="" x="1090.86" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[libc-2.24.so] (554 samples, 0.48%)</title><rect x="11.0" y="373" width="5.6" height="15.0" fill="rgb(230,61,47)" rx="2" ry="2" />
+<text text-anchor="" x="14.02" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[ld-2.24.so] (34 samples, 0.03%)</title><rect x="16.8" y="325" width="0.3" height="15.0" fill="rgb(224,79,23)" rx="2" ry="2" />
+<text text-anchor="" x="19.80" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_execveat_common.isra.37 (12 samples, 0.01%)</title><rect x="1189.9" y="309" width="0.1" height="15.0" fill="rgb(224,107,37)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain@plt (156 samples, 0.13%)</title><rect x="1154.2" y="245" width="1.6" height="15.0" fill="rgb(209,154,38)" rx="2" ry="2" />
+<text text-anchor="" x="1157.17" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>walk_page_range (55 samples, 0.05%)</title><rect x="18.8" y="85" width="0.6" height="15.0" fill="rgb(236,153,54)" rx="2" ry="2" />
+<text text-anchor="" x="21.81" y="95.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain (555 samples, 0.48%)</title><rect x="811.7" y="261" width="5.6" height="15.0" fill="rgb(220,77,1)" rx="2" ry="2" />
+<text text-anchor="" x="814.70" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[libc-2.24.so] (230 samples, 0.20%)</title><rect x="764.5" y="229" width="2.3" height="15.0" fill="rgb(213,56,3)" rx="2" ry="2" />
+<text text-anchor="" x="767.50" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>protocol witness for app.Subcommand.init(arguments: [Swift.String]) throws -&gt; A in conformance app.Forward : app.Subcommand in app (150 samples, 0.13%)</title><rect x="18.4" y="325" width="1.6" height="15.0" fill="rgb(222,51,24)" rx="2" ry="2" />
+<text text-anchor="" x="21.44" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release@plt (602 samples, 0.52%)</title><rect x="805.6" y="261" width="6.1" height="15.0" fill="rgb(215,72,14)" rx="2" ry="2" />
+<text text-anchor="" x="808.60" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (4,556 samples, 3.92%)</title><rect x="20.4" y="293" width="46.2" height="15.0" fill="rgb(207,124,33)" rx="2" ry="2" />
+<text text-anchor="" x="23.41" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pagemap_pte_hole (67 samples, 0.06%)</title><rect x="18.7" y="133" width="0.7" height="15.0" fill="rgb(251,0,18)" rx="2" ry="2" />
+<text text-anchor="" x="21.70" y="143.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #4 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (4,950 samples, 4.26%)</title><rect x="1071.5" y="245" width="50.3" height="15.0" fill="rgb(251,73,15)" rx="2" ry="2" />
+<text text-anchor="" x="1074.54" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >funct..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (12 samples, 0.01%)</title><rect x="1189.9" y="341" width="0.1" height="15.0" fill="rgb(238,44,40)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (12 samples, 0.01%)</title><rect x="1189.9" y="357" width="0.1" height="15.0" fill="rgb(232,96,0)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_once (15 samples, 0.01%)</title><rect x="785.9" y="245" width="0.2" height="15.0" fill="rgb(229,117,7)" rx="2" ry="2" />
+<text text-anchor="" x="788.92" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.ReceiveQueue.fetchAvailablePackets() -&gt; [ixy.DMAMempool.Pointer] (37,756 samples, 32.46%)</title><rect x="436.2" y="277" width="383.0" height="15.0" fill="rgb(221,140,43)" rx="2" ry="2" />
+<text text-anchor="" x="439.22" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >ixy.ReceiveQueue.fetchAvailablePackets() -&gt; [ixy.DMA..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (72 samples, 0.06%)</title><rect x="763.3" y="245" width="0.8" height="15.0" fill="rgb(234,199,40)" rx="2" ry="2" />
+<text text-anchor="" x="766.34" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>app.Forward.init(device1Address: ixy.PCIAddress, device2Address: ixy.PCIAddress) throws -&gt; app.Forward (149 samples, 0.13%)</title><rect x="18.4" y="293" width="1.6" height="15.0" fill="rgb(229,154,43)" rx="2" ry="2" />
+<text text-anchor="" x="21.44" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (12 samples, 0.01%)</title><rect x="1189.9" y="373" width="0.1" height="15.0" fill="rgb(216,19,18)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_n_ (4,794 samples, 4.12%)</title><rect x="359.9" y="277" width="48.6" height="15.0" fill="rgb(233,159,52)" rx="2" ry="2" />
+<text text-anchor="" x="362.85" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.ReceiveQueue.processBatch() -&gt; () (7,640 samples, 6.57%)</title><rect x="708.6" y="261" width="77.5" height="15.0" fill="rgb(240,188,32)" rx="2" ry="2" />
+<text text-anchor="" x="711.62" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >ixy.Rece..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>perf_4.9 (12 samples, 0.01%)</title><rect x="1189.9" y="389" width="0.1" height="15.0" fill="rgb(208,189,0)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_once@plt (191 samples, 0.16%)</title><rect x="1119.8" y="229" width="2.0" height="15.0" fill="rgb(218,162,34)" rx="2" ry="2" />
+<text text-anchor="" x="1122.82" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #2 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (13 samples, 0.01%)</title><rect x="1071.4" y="245" width="0.1" height="15.0" fill="rgb(229,178,27)" rx="2" ry="2" />
+<text text-anchor="" x="1074.41" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain (207 samples, 0.18%)</title><rect x="1171.3" y="277" width="2.1" height="15.0" fill="rgb(211,149,20)" rx="2" ry="2" />
+<text text-anchor="" x="1174.34" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pagemap_read (65 samples, 0.06%)</title><rect x="18.7" y="101" width="0.7" height="15.0" fill="rgb(208,82,32)" rx="2" ry="2" />
+<text text-anchor="" x="21.70" y="111.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (13,183 samples, 11.33%)</title><rect x="572.8" y="261" width="133.8" height="15.0" fill="rgb(206,7,32)" rx="2" ry="2" />
+<text text-anchor="" x="575.82" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift_retain_</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_allocObject_ (12 samples, 0.01%)</title><rect x="767.0" y="229" width="0.1" height="15.0" fill="rgb(240,123,4)" rx="2" ry="2" />
+<text text-anchor="" x="769.97" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>perf_event_exec (11 samples, 0.01%)</title><rect x="1189.9" y="213" width="0.1" height="15.0" fill="rgb(245,46,31)" rx="2" ry="2" />
+<text text-anchor="" x="1192.89" y="223.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[1] = Dead&gt; of static ixy.Device.createPacketBuffer(count: Swift.UInt) throws -&gt; (ixy.DMAMempool, ixy.MemoryMap) (118 samples, 0.10%)</title><rect x="18.5" y="261" width="1.2" height="15.0" fill="rgb(215,156,43)" rx="2" ry="2" />
+<text text-anchor="" x="21.46" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[ld-2.24.so] (46 samples, 0.04%)</title><rect x="16.7" y="357" width="0.5" height="15.0" fill="rgb(225,81,27)" rx="2" ry="2" />
+<text text-anchor="" x="19.70" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain (206 samples, 0.18%)</title><rect x="1152.1" y="245" width="2.1" height="15.0" fill="rgb(219,45,21)" rx="2" ry="2" />
+<text text-anchor="" x="1155.08" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #4 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (184 samples, 0.16%)</title><rect x="983.0" y="261" width="1.9" height="15.0" fill="rgb(230,154,39)" rx="2" ry="2" />
+<text text-anchor="" x="986.01" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>malloc_usable_size (35 samples, 0.03%)</title><rect x="773.2" y="229" width="0.3" height="15.0" fill="rgb(240,204,37)" rx="2" ry="2" />
+<text text-anchor="" x="776.18" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__check_object_size (12 samples, 0.01%)</title><rect x="1189.9" y="261" width="0.1" height="15.0" fill="rgb(226,220,22)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Device.init(address: ixy.PCIAddress, receiveQueues: Swift.UInt, transmitQueues: Swift.UInt) throws -&gt; ixy.Device (147 samples, 0.13%)</title><rect x="18.4" y="277" width="1.5" height="15.0" fill="rgb(242,190,46)" rx="2" ry="2" />
+<text text-anchor="" x="21.44" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>generic specialization &lt;ixy.DMAMempool.Pointer&gt; of Swift.Array._copyToNewBuffer(oldCount: Swift.Int) -&gt; () (1,080 samples, 0.93%)</title><rect x="764.2" y="245" width="11.0" height="15.0" fill="rgb(218,197,54)" rx="2" ry="2" />
+<text text-anchor="" x="767.24" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift::metadataimpl::ValueWitnesses&lt;swift::metadataimpl::SwiftRetainableBox&gt;::destroy (238 samples, 0.20%)</title><rect x="66.6" y="293" width="2.4" height="15.0" fill="rgb(236,60,44)" rx="2" ry="2" />
+<text text-anchor="" x="69.63" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Driver.update(queue: ixy.ReceiveQueue, tailIndex: Swift.UInt32) -&gt; () (38 samples, 0.03%)</title><rect x="783.9" y="245" width="0.4" height="15.0" fill="rgb(224,168,1)" rx="2" ry="2" />
+<text text-anchor="" x="786.95" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_dealloc (5,411 samples, 4.65%)</title><rect x="20.1" y="309" width="54.9" height="15.0" fill="rgb(248,100,14)" rx="2" ry="2" />
+<text text-anchor="" x="23.14" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swif..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>copy_strings.isra.25 (12 samples, 0.01%)</title><rect x="1189.9" y="277" width="0.1" height="15.0" fill="rgb(237,147,44)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vm_mmap_pgoff (13 samples, 0.01%)</title><rect x="10.9" y="309" width="0.1" height="15.0" fill="rgb(219,204,54)" rx="2" ry="2" />
+<text text-anchor="" x="13.87" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pagemap_hugetlb_range (43 samples, 0.04%)</title><rect x="18.9" y="37" width="0.5" height="15.0" fill="rgb(207,214,5)" rx="2" ry="2" />
+<text text-anchor="" x="21.92" y="47.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>app.Forward.init(arguments: [Swift.String]) throws -&gt; app.Forward (150 samples, 0.13%)</title><rect x="18.4" y="309" width="1.6" height="15.0" fill="rgb(248,96,11)" rx="2" ry="2" />
+<text text-anchor="" x="21.44" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (10 samples, 0.01%)</title><rect x="1188.9" y="373" width="0.1" height="15.0" fill="rgb(210,105,14)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Swift._ContiguousArrayStorage.__deallocating_deinit (25 samples, 0.02%)</title><rect x="20.2" y="293" width="0.2" height="15.0" fill="rgb(223,137,48)" rx="2" ry="2" />
+<text text-anchor="" x="23.15" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pagemap_hugetlb_range (67 samples, 0.06%)</title><rect x="18.7" y="149" width="0.7" height="15.0" fill="rgb(210,179,34)" rx="2" ry="2" />
+<text text-anchor="" x="21.70" y="159.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pthread_once@plt (191 samples, 0.16%)</title><rect x="1104.7" y="229" width="1.9" height="15.0" fill="rgb(219,5,2)" rx="2" ry="2" />
+<text text-anchor="" x="1107.65" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__walk_page_range (52 samples, 0.04%)</title><rect x="18.8" y="53" width="0.6" height="15.0" fill="rgb(244,146,42)" rx="2" ry="2" />
+<text text-anchor="" x="21.83" y="63.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_group_exit (10 samples, 0.01%)</title><rect x="1188.9" y="325" width="0.1" height="15.0" fill="rgb(243,139,25)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__libc_start_main (115,362 samples, 99.18%)</title><rect x="18.4" y="357" width="1170.3" height="15.0" fill="rgb(230,124,52)" rx="2" ry="2" />
+<text text-anchor="" x="21.42" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >__libc_start_main</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (4,850 samples, 4.17%)</title><rect x="151.4" y="293" width="49.2" height="15.0" fill="rgb(242,109,2)" rx="2" ry="2" />
+<text text-anchor="" x="154.36" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__pthread_once (198 samples, 0.17%)</title><rect x="1075.0" y="229" width="2.0" height="15.0" fill="rgb(228,89,13)" rx="2" ry="2" />
+<text text-anchor="" x="1077.96" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__tls_get_addr (21 samples, 0.02%)</title><rect x="763.1" y="245" width="0.2" height="15.0" fill="rgb(251,16,46)" rx="2" ry="2" />
+<text text-anchor="" x="766.12" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>merged function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #4 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (1,496 samples, 1.29%)</title><rect x="1089.5" y="229" width="15.2" height="15.0" fill="rgb(253,204,13)" rx="2" ry="2" />
+<text text-anchor="" x="1092.48" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (6,251 samples, 5.37%)</title><rect x="1008.0" y="245" width="63.4" height="15.0" fill="rgb(214,129,51)" rx="2" ry="2" />
+<text text-anchor="" x="1011.00" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_isUniquelyReferenced_nonNull_native@plt (163 samples, 0.14%)</title><rect x="1150.4" y="245" width="1.7" height="15.0" fill="rgb(235,159,3)" rx="2" ry="2" />
+<text text-anchor="" x="1153.42" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>app (116,308 samples, 99.99%)</title><rect x="10.0" y="389" width="1179.9" height="15.0" fill="rgb(242,25,29)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >app</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (13 samples, 0.01%)</title><rect x="10.9" y="357" width="0.1" height="15.0" fill="rgb(226,150,41)" rx="2" ry="2" />
+<text text-anchor="" x="13.87" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_arrayDestroy (58 samples, 0.05%)</title><rect x="773.8" y="229" width="0.5" height="15.0" fill="rgb(243,157,11)" rx="2" ry="2" />
+<text text-anchor="" x="776.75" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Descriptor.cleanUpTransmitted() -&gt; () (2,199 samples, 1.89%)</title><rect x="1121.8" y="245" width="22.3" height="15.0" fill="rgb(252,107,45)" rx="2" ry="2" />
+<text text-anchor="" x="1124.76" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)() -&gt; () (16,462 samples, 14.15%)</title><rect x="988.8" y="261" width="167.0" height="15.0" fill="rgb(208,165,45)" rx="2" ry="2" />
+<text text-anchor="" x="991.75" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >ixy.TransmitQueue.(cl..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_execve (12 samples, 0.01%)</title><rect x="1189.9" y="325" width="0.1" height="15.0" fill="rgb(205,13,3)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (7,497 samples, 6.45%)</title><rect x="75.3" y="293" width="76.1" height="15.0" fill="rgb(236,65,4)" rx="2" ry="2" />
+<text text-anchor="" x="78.30" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift_r..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__tls_get_addr (1,073 samples, 0.92%)</title><rect x="1077.0" y="229" width="10.9" height="15.0" fill="rgb(211,186,52)" rx="2" ry="2" />
+<text text-anchor="" x="1079.97" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (13,466 samples, 11.58%)</title><rect x="436.2" y="261" width="136.6" height="15.0" fill="rgb(254,196,41)" rx="2" ry="2" />
+<text text-anchor="" x="439.22" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift_release_</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (25 samples, 0.02%)</title><rect x="1007.7" y="245" width="0.3" height="15.0" fill="rgb(239,114,38)" rx="2" ry="2" />
+<text text-anchor="" x="1010.75" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (76 samples, 0.07%)</title><rect x="18.7" y="197" width="0.7" height="15.0" fill="rgb(243,201,51)" rx="2" ry="2" />
+<text text-anchor="" x="21.67" y="207.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (13 samples, 0.01%)</title><rect x="10.9" y="341" width="0.1" height="15.0" fill="rgb(213,81,29)" rx="2" ry="2" />
+<text text-anchor="" x="13.87" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (13 samples, 0.01%)</title><rect x="20.0" y="309" width="0.1" height="15.0" fill="rgb(242,78,46)" rx="2" ry="2" />
+<text text-anchor="" x="23.01" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>kmem_cache_alloc_trace (53 samples, 0.05%)</title><rect x="18.8" y="69" width="0.6" height="15.0" fill="rgb(250,114,24)" rx="2" ry="2" />
+<text text-anchor="" x="21.83" y="79.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_once (1,304 samples, 1.12%)</title><rect x="1106.6" y="229" width="13.2" height="15.0" fill="rgb(211,92,14)" rx="2" ry="2" />
+<text text-anchor="" x="1109.59" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>main (115,360 samples, 99.17%)</title><rect x="18.4" y="341" width="1170.3" height="15.0" fill="rgb(233,213,4)" rx="2" ry="2" />
+<text text-anchor="" x="21.44" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >main</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>malloc (81 samples, 0.07%)</title><rect x="1189.0" y="373" width="0.8" height="15.0" fill="rgb(228,123,27)" rx="2" ry="2" />
+<text text-anchor="" x="1192.02" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_slowAlloc (12 samples, 0.01%)</title><rect x="775.0" y="229" width="0.2" height="15.0" fill="rgb(234,199,32)" rx="2" ry="2" />
+<text text-anchor="" x="778.03" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_isUniquelyReferenced_nonNull_native (12 samples, 0.01%)</title><rect x="774.8" y="229" width="0.1" height="15.0" fill="rgb(241,87,17)" rx="2" ry="2" />
+<text text-anchor="" x="777.82" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>protocol witness for app.Subcommand.loop() -&gt; () in conformance app.Forward : app.Subcommand in app (115,210 samples, 99.05%)</title><rect x="20.0" y="325" width="1168.7" height="15.0" fill="rgb(208,123,18)" rx="2" ry="2" />
+<text text-anchor="" x="22.96" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >protocol witness for app.Subcommand.loop() -&gt; () in conformance app.Forward : app.Subcommand in app</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_exit (10 samples, 0.01%)</title><rect x="1188.9" y="309" width="0.1" height="15.0" fill="rgb(247,47,47)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>function signature specialization &lt;Arg[3] = Dead&gt; of generic specialization &lt;Swift._ContiguousArrayBuffer&lt;ixy.DMAMempool.Pointer&gt;, Swift._IgnorePointer&lt;ixy.DMAMempool.Pointer&gt;&gt; of (extension in Swift):Swift._ArrayBufferProtocol._arrayOutOfPlaceUpdate&lt;A where A1: Swift._PointerFunction, A.Element == A1.Element&gt;(inout Swift._ContiguousArrayBuffer&lt;A.Element&gt;, Swift.Int, Swift.Int, A1) -&gt; () (195 samples, 0.17%)</title><rect x="770.2" y="229" width="2.0" height="15.0" fill="rgb(218,204,40)" rx="2" ry="2" />
+<text text-anchor="" x="773.24" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (8,553 samples, 7.35%)</title><rect x="857.0" y="261" width="86.8" height="15.0" fill="rgb(218,185,54)" rx="2" ry="2" />
+<text text-anchor="" x="860.05" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swift_rel..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Device.open() throws -&gt; () (23 samples, 0.02%)</title><rect x="19.7" y="261" width="0.2" height="15.0" fill="rgb(226,51,42)" rx="2" ry="2" />
+<text text-anchor="" x="22.69" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[ld-2.24.so] (39 samples, 0.03%)</title><rect x="16.8" y="341" width="0.4" height="15.0" fill="rgb(221,26,46)" rx="2" ry="2" />
+<text text-anchor="" x="19.77" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[libc-2.24.so] (114 samples, 0.10%)</title><rect x="17.2" y="357" width="1.1" height="15.0" fill="rgb(226,52,21)" rx="2" ry="2" />
+<text text-anchor="" x="20.16" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Descriptor.cleanUpTransmitted() -&gt; () (377 samples, 0.32%)</title><rect x="984.9" y="261" width="3.9" height="15.0" fill="rgb(220,85,30)" rx="2" ry="2" />
+<text text-anchor="" x="987.93" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[ld-2.24.so] (29 samples, 0.02%)</title><rect x="10.6" y="357" width="0.3" height="15.0" fill="rgb(237,105,25)" rx="2" ry="2" />
+<text text-anchor="" x="13.58" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>setup_new_exec (12 samples, 0.01%)</title><rect x="1189.9" y="229" width="0.1" height="15.0" fill="rgb(236,137,12)" rx="2" ry="2" />
+<text text-anchor="" x="1192.88" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain@plt (183 samples, 0.16%)</title><rect x="1160.9" y="261" width="1.8" height="15.0" fill="rgb(246,76,11)" rx="2" ry="2" />
+<text text-anchor="" x="1163.89" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>page_fault (11 samples, 0.01%)</title><rect x="17.0" y="309" width="0.1" height="15.0" fill="rgb(236,203,31)" rx="2" ry="2" />
+<text text-anchor="" x="20.02" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (10 samples, 0.01%)</title><rect x="1188.9" y="357" width="0.1" height="15.0" fill="rgb(228,191,39)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Swift._ContiguousArrayStorage.__deallocating_deinit (12 samples, 0.01%)</title><rect x="768.5" y="213" width="0.1" height="15.0" fill="rgb(227,207,4)" rx="2" ry="2" />
+<text text-anchor="" x="771.50" y="223.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (12 samples, 0.01%)</title><rect x="10.7" y="325" width="0.1" height="15.0" fill="rgb(225,126,31)" rx="2" ry="2" />
+<text text-anchor="" x="13.66" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain_n (235 samples, 0.20%)</title><rect x="1173.5" y="277" width="2.3" height="15.0" fill="rgb(209,57,51)" rx="2" ry="2" />
+<text text-anchor="" x="1176.46" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_isUniquelyReferenced_nonNull_native (805 samples, 0.69%)</title><rect x="788.1" y="261" width="8.1" height="15.0" fill="rgb(241,144,5)" rx="2" ry="2" />
+<text text-anchor="" x="791.06" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (77 samples, 0.07%)</title><rect x="18.7" y="213" width="0.7" height="15.0" fill="rgb(241,105,18)" rx="2" ry="2" />
+<text text-anchor="" x="21.66" y="223.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (4,728 samples, 4.06%)</title><rect x="311.9" y="277" width="48.0" height="15.0" fill="rgb(240,150,46)" rx="2" ry="2" />
+<text text-anchor="" x="314.89" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_swi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>outlined consume of ixy.Descriptor.ReceiveResponse (156 samples, 0.13%)</title><rect x="784.3" y="245" width="1.6" height="15.0" fill="rgb(212,124,4)" rx="2" ry="2" />
+<text text-anchor="" x="787.33" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release@plt (199 samples, 0.17%)</title><rect x="1169.3" y="277" width="2.0" height="15.0" fill="rgb(229,31,53)" rx="2" ry="2" />
+<text text-anchor="" x="1172.33" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.DMAMempool.init(memory: Swift.UnsafeMutableRawPointer, entrySize: Swift.UInt, entryCount: Swift.UInt) throws -&gt; ixy.DMAMempool (97 samples, 0.08%)</title><rect x="18.6" y="245" width="0.9" height="15.0" fill="rgb(237,72,36)" rx="2" ry="2" />
+<text text-anchor="" x="21.56" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.Descriptor.receivePacket() -&gt; ixy.Descriptor.ReceiveResponse (195 samples, 0.17%)</title><rect x="706.6" y="261" width="2.0" height="15.0" fill="rgb(211,6,19)" rx="2" ry="2" />
+<text text-anchor="" x="709.62" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>merged function signature specialization &lt;Arg[2] = Dead, Arg[3] = Owned To Guaranteed&gt; of function signature specialization &lt;Arg[0] = [Closure Propagated : implicit closure #4 : @autoclosure () -&gt; Swift.String in ixy.TransmitQueue.(cleanUp in _822F2224945B23EA9E5BAF810DE6879F)(descriptor: ixy.Descriptor) -&gt; Swift.Bool, Argument Types : [ixy.Descriptor]&gt; of static ixy.Log.log(_: @autoclosure () -&gt; Swift.String, level: ixy.Log.Level, component: Swift.String) -&gt; () (174 samples, 0.15%)</title><rect x="1144.9" y="245" width="1.8" height="15.0" fill="rgb(243,75,54)" rx="2" ry="2" />
+<text text-anchor="" x="1147.89" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_isUniquelyReferenced_nonNull_native@plt (165 samples, 0.14%)</title><rect x="796.2" y="261" width="1.7" height="15.0" fill="rgb(220,19,29)" rx="2" ry="2" />
+<text text-anchor="" x="799.22" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain@plt (187 samples, 0.16%)</title><rect x="817.3" y="261" width="1.9" height="15.0" fill="rgb(239,184,17)" rx="2" ry="2" />
+<text text-anchor="" x="820.33" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain (173 samples, 0.15%)</title><rect x="1159.1" y="261" width="1.8" height="15.0" fill="rgb(217,20,17)" rx="2" ry="2" />
+<text text-anchor="" x="1162.13" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>generic specialization &lt;Swift._ContiguousArrayBuffer&lt;ixy.DMAMempool.Pointer&gt;&gt; of (extension in Swift):Swift._ArrayBufferProtocol._forceCreateUniqueMutableBuffer(countForNewBuffer: Swift.Int, minNewCapacity: Swift.Int) -&gt; Swift._ContiguousArrayBuffer&lt;A.Element&gt; (68 samples, 0.06%)</title><rect x="772.2" y="229" width="0.7" height="15.0" fill="rgb(209,19,54)" rx="2" ry="2" />
+<text text-anchor="" x="775.22" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_release_ (137 samples, 0.12%)</title><rect x="767.1" y="229" width="1.4" height="15.0" fill="rgb(215,60,25)" rx="2" ry="2" />
+<text text-anchor="" x="770.09" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.TransmitQueue.transmit(_: [ixy.DMAMempool.Pointer], freeUnused: Swift.Bool) -&gt; Swift.Int (33,861 samples, 29.11%)</title><rect x="819.2" y="277" width="343.5" height="15.0" fill="rgb(215,151,22)" rx="2" ry="2" />
+<text text-anchor="" x="822.24" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >ixy.TransmitQueue.transmit(_: [ixy.DMAMempool...</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.DMAMempool.Pointer.touch() -&gt; () (2,734 samples, 2.35%)</title><rect x="408.5" y="277" width="27.7" height="15.0" fill="rgb(239,95,16)" rx="2" ry="2" />
+<text text-anchor="" x="411.48" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release (649 samples, 0.56%)</title><rect x="1162.7" y="277" width="6.6" height="15.0" fill="rgb(218,220,45)" rx="2" ry="2" />
+<text text-anchor="" x="1165.74" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_arrayDestroy (382 samples, 0.33%)</title><rect x="69.0" y="293" width="3.9" height="15.0" fill="rgb(217,204,36)" rx="2" ry="2" />
+<text text-anchor="" x="72.04" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pagemap_pmd_range (67 samples, 0.06%)</title><rect x="18.7" y="117" width="0.7" height="15.0" fill="rgb(237,22,1)" rx="2" ry="2" />
+<text text-anchor="" x="21.70" y="127.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>app.Forward.loop() -&gt; () (109,773 samples, 94.37%)</title><rect x="75.0" y="309" width="1113.6" height="15.0" fill="rgb(241,77,14)" rx="2" ry="2" />
+<text text-anchor="" x="78.04" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >app.Forward.loop() -&gt; ()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_retain_n@plt (190 samples, 0.16%)</title><rect x="1175.8" y="277" width="2.0" height="15.0" fill="rgb(206,5,0)" rx="2" ry="2" />
+<text text-anchor="" x="1178.85" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__intel_pmu_enable_all.constprop.17 (11 samples, 0.01%)</title><rect x="1189.9" y="197" width="0.1" height="15.0" fill="rgb(209,92,22)" rx="2" ry="2" />
+<text text-anchor="" x="1192.89" y="207.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>native_write_msr (11 samples, 0.01%)</title><rect x="1189.9" y="181" width="0.1" height="15.0" fill="rgb(248,123,15)" rx="2" ry="2" />
+<text text-anchor="" x="1192.89" y="191.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>exit_mmap (10 samples, 0.01%)</title><rect x="1188.9" y="277" width="0.1" height="15.0" fill="rgb(223,116,19)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vfs_read (76 samples, 0.07%)</title><rect x="18.7" y="165" width="0.7" height="15.0" fill="rgb(228,171,16)" rx="2" ry="2" />
+<text text-anchor="" x="21.67" y="175.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release (197 samples, 0.17%)</title><rect x="1179.8" y="293" width="2.0" height="15.0" fill="rgb(236,185,12)" rx="2" ry="2" />
+<text text-anchor="" x="1182.79" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (12 samples, 0.01%)</title><rect x="10.7" y="341" width="0.1" height="15.0" fill="rgb(243,215,13)" rx="2" ry="2" />
+<text text-anchor="" x="13.66" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (115,549 samples, 99.34%)</title><rect x="16.7" y="373" width="1172.2" height="15.0" fill="rgb(239,185,15)" rx="2" ry="2" />
+<text text-anchor="" x="19.70" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >[unknown]</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixy.DMAMempool.Pointer.touch() -&gt; () (198 samples, 0.17%)</title><rect x="1177.8" y="293" width="2.0" height="15.0" fill="rgb(254,125,33)" rx="2" ry="2" />
+<text text-anchor="" x="1180.78" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_mmap_pgoff (13 samples, 0.01%)</title><rect x="10.9" y="325" width="0.1" height="15.0" fill="rgb(226,42,29)" rx="2" ry="2" />
+<text text-anchor="" x="13.87" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_swift_retain_ (3,864 samples, 3.32%)</title><rect x="943.8" y="261" width="39.2" height="15.0" fill="rgb(208,29,52)" rx="2" ry="2" />
+<text text-anchor="" x="946.81" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >_sw..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__tls_get_addr (12 samples, 0.01%)</title><rect x="856.9" y="261" width="0.1" height="15.0" fill="rgb(241,50,18)" rx="2" ry="2" />
+<text text-anchor="" x="859.93" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (116,320 samples, 100%)</title><rect x="10.0" y="405" width="1180.0" height="15.0" fill="rgb(251,104,23)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[ld-2.24.so] (99 samples, 0.09%)</title><rect x="10.0" y="373" width="1.0" height="15.0" fill="rgb(211,105,10)" rx="2" ry="2" />
+<text text-anchor="" x="13.01" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__wake_up_parent (10 samples, 0.01%)</title><rect x="1188.9" y="341" width="0.1" height="15.0" fill="rgb(208,165,25)" rx="2" ry="2" />
+<text text-anchor="" x="1191.91" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_release@plt (218 samples, 0.19%)</title><rect x="1181.8" y="293" width="2.2" height="15.0" fill="rgb(249,48,2)" rx="2" ry="2" />
+<text text-anchor="" x="1184.79" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>app.Forward.(process in _5BF893C69353326F96D162ECD20E0905)(from: ixy.Device, to: ixy.Device, queue: Swift.Int) -&gt; () (96,330 samples, 82.81%)</title><rect x="200.6" y="293" width="977.2" height="15.0" fill="rgb(241,37,14)" rx="2" ry="2" />
+<text text-anchor="" x="203.56" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >app.Forward.(process in _5BF893C69353326F96D162ECD20E0905)(from: ixy.Device, to: ixy.Device, queue: Swift.Int) -&gt; ()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>swift_isUniquelyReferenced_nonNull_native (371 samples, 0.32%)</title><rect x="1146.7" y="245" width="3.7" height="15.0" fill="rgb(216,225,42)" rx="2" ry="2" />
+<text text-anchor="" x="1149.65" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+</svg>

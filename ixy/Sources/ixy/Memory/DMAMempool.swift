@@ -60,9 +60,13 @@ public class DMAMempool {
 
 	internal let memory: DMAMemory
 	internal var entries: [Pointer] = []
-//	internal let availableEntries: FixedStack<Pointer>
-//	internal var availableEntries: [Unmanaged<Pointer>] = []
+	#if USE_FIXED_SIZE_ARRAY
+	internal let availableEntries: FixedStack<Pointer>
+	#elseif USE_UNMANAGED_ARRAY
+	internal var availableEntries: [Unmanaged<Pointer>] = []
+	#else
 	internal var availableEntries: [Pointer] = []
+	#endif
 
 	init(memory: UnsafeMutableRawPointer, entrySize: UInt, entryCount: UInt) throws {
 		guard entryCount > 0 else {
@@ -72,7 +76,9 @@ public class DMAMempool {
 		let pagemap = try Pagemap()
 
 		self.memory = dmaMemory
-//		self.availableEntries = FixedStack(size: Int(entryCount))
+		#if USE_FIXED_SIZE_ARRAY
+		self.availableEntries = FixedStack(size: Int(entryCount))
+		#endif
 		// create entry wrappers
 		self.entries = try (0..<entryCount).compactMap {
 			let advanced = memory.advanced(by: Int($0 * entrySize))
@@ -80,34 +86,39 @@ public class DMAMempool {
 			let entry = Entry(pointer: dma, size: entrySize)
 			return Pointer(entry: entry, mempool: self)
 		}
+		#if USE_FIXED_SIZE_ARRAY
+		self.availableEntries.initialize(from: self.entries)
+		#elseif USE_UNMANAGED_ARRAY
+		self.availableEntries = self.entries.map { return Unmanaged<Pointer>.passUnretained($0)	}
+		#else
 		self.availableEntries = self.entries
-//		self.availableEntries = self.entries.map { return Unmanaged<Pointer>.passUnretained($0)	}
-//		self.availableEntries.initialize(from: self.entries)
+		#endif
 	}
 
-//	func getFreePointer() -> Pointer? {
-//		return self.availableEntries.pop()
-//	}
-//
-//	fileprivate func freePointer(_ pointer: Pointer) {
-//		self.availableEntries.push(pointer)
-//	}
+	#if USE_FIXED_SIZE_ARRAY
+	func getFreePointer() -> Pointer? {
+		return self.availableEntries.pop()
+	}
 
+	fileprivate func freePointer(_ pointer: Pointer) {
+		self.availableEntries.push(pointer)
+	}
 
-//	func getFreePointer() -> Pointer? {
-//		guard self.availableEntries.count > 0 else { return nil }
-//		let pointer = self.availableEntries.removeLast().takeUnretainedValue()
-//		pointer.entry.inUse = true
-//		return pointer
-//	}
-//
-//	fileprivate func freePointer(_ pointer: Pointer) {
-//		pointer.entry.inUse = false
-//		self.availableEntries.append(Unmanaged.passUnretained(pointer))
-//		//Log.info("did free \(pointer.entry.pointer.virtual)", component: .mempool)
-//		//		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
-//	}
+	#elseif USE_UNMANAGED_ARRAY
 
+	func getFreePointer() -> Pointer? {
+		guard self.availableEntries.count > 0 else { return nil }
+		let pointer = self.availableEntries.removeLast().takeUnretainedValue()
+		pointer.entry.inUse = true
+		return pointer
+	}
+
+	fileprivate func freePointer(_ pointer: Pointer) {
+		pointer.entry.inUse = false
+		self.availableEntries.append(Unmanaged.passUnretained(pointer))
+	}
+
+	#else
 
 	func getFreePointer() -> Pointer? {
 		guard self.availableEntries.count > 0 else { return nil }
@@ -119,9 +130,9 @@ public class DMAMempool {
 	fileprivate func freePointer(_ pointer: Pointer) {
 		pointer.entry.inUse = false
 		self.availableEntries.append(pointer)
-		//Log.info("did free \(pointer.entry.pointer.virtual)", component: .mempool)
-//		Log.debug("free \(entry.pointer.virtual) (available=\(self.availableEntries.count))", component: .mempool)
 	}
+
+	#endif
 }
 
 extension DMAMemory {
