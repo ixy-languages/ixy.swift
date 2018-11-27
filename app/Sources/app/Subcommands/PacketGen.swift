@@ -9,7 +9,7 @@ import Foundation
 import ixy
 
 class PacketGen: Subcommand {
-	static let usage: String = "[device1] [device2]"
+	static let usage: String = "[device1]"
 
 	private let device: Device
 	private var stats: DeviceStats

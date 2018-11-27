@@ -15,7 +15,7 @@ While evaluating the Swift solution, the following were other implementations we
 The performance analysis was done on a Intel(R) Xeon(R) CPU E3-1230 V2 @ 3.30GHz with a X520 as Intel 82599 network interface controller.
 All test runs were done using the `ixy-perf-measurements/` scripts for testing different cpu speeds.
 
-![Comparison](comparison.png)
+![Comparison](Comparison.png)
 
 For this comparison, the normal release Swift version without any C-Code was used. Unfortunately, Swift did not meet the performance anticipated when starting the project.
 
@@ -47,12 +47,12 @@ Another performance improvement in the C version was due to a batch cleanup of o
 
 Combining both, the C stand-ins and the batch transmit cleanup, the debug version is somehow slower than just the C stand-in, but faster than the batch TX version. In release configuration, the performance is between only the batch tx cleanup and the C stand in version.
 
-![Version comparison](versions.png)
+![Version comparison](Versions.png)
 
 Another approach to improving the speed was to try changing the memory pool data structure. Three different approaches were evaluated: a simple array, a fixed size array and an array with unmanaged objects (which aren't reference counted in Swift).
 Unfortunately, none of these alternatives were faster than the base version.
 
-![Array comparison](arrays.png)
+![Array comparison](Arrays.png)
 
 In conclusion, the current Swift version is far slower than the other. Although three different developers with Swift experience reviewed the code, no one found bottlenecks introduced by bad programming patterns. There is nearly no dynamic dispatch in critical sections and object allocations/copies are rarely created.
 It might be possible that there are ways to improve the performance, but as the current code is quite standard Swift code, some solutions might offer better performance with the cost of having more C-like code without object-orientation.
