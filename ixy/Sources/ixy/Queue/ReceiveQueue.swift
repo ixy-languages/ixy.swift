@@ -6,21 +6,38 @@ public final class ReceiveQueue : Queue {
 
 	/// fetches available packet from the ring buffer and returns them
 	///
+	/// - Parameter limit: optionally limit the packet count
 	/// - Returns: array of packets
-	public func fetchAvailablePackets() -> [DMAMempool.Pointer] {
-		processBatch()
+	public func fetchAvailablePackets(limit: Int? = nil) -> [DMAMempool.Pointer] {
+		self.availablePackets = []
+		if let limit = limit {
+			availablePackets.reserveCapacity(limit)
+		}
+		processBatch(limit: limit)
 		let packets = self.availablePackets
+		// set to zero to remove strong references
 		self.availablePackets = []
 		return packets
 	}
 
-	func processBatch() {
+	func processBatch(limit: Int? = nil) {
 		var lastIndex = tailIndex
 		let lastRxIndex = tailIndex
-		while process(descriptor: descriptors[tailIndex]) {
-			lastIndex = tailIndex
-			tailIndex ++< descriptors.count
+		// split using if else to reduce unnecessary overhead
+		if var remaining = limit {
+			while remaining > 0, process(descriptor: descriptors[tailIndex]) {
+				lastIndex = tailIndex
+				tailIndex ++< descriptors.count
+				remaining -= 1
+			}
+		} else {
+			while process(descriptor: descriptors[tailIndex]) {
+				lastIndex = tailIndex
+				tailIndex ++< descriptors.count
+			}
 		}
+
+		// update register if necessary
 		if lastRxIndex != tailIndex {
 			self.driver.update(queue: self, tailIndex: UInt32(lastIndex))
 		}

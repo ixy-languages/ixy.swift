@@ -19,6 +19,7 @@ class Forward: Subcommand {
 
 	let device1: Device
 	let device2: Device
+	let batchSize: Int?
 	var overallStats1: DeviceStats = .zero
 	var overallStats2: DeviceStats = .zero
 
@@ -28,7 +29,7 @@ class Forward: Subcommand {
 		case sameDevice
 	}
 
-	init(device1Address: PCIAddress, device2Address: PCIAddress) throws {
+	init(device1Address: PCIAddress, device2Address: PCIAddress, batchSize: Int? = nil) throws {
 		// check if it's the same device
 		guard device1Address != device2Address else { throw Error.sameDevice }
 
@@ -37,6 +38,7 @@ class Forward: Subcommand {
 		// init devices
 		self.device1 = try Device(address: device1Address, receiveQueues: 1, transmitQueues: 1)
 		self.device2 = try Device(address: device2Address, receiveQueues: 1, transmitQueues: 1)
+		self.batchSize = batchSize
 	}
 
 	// Subcommand init implementation
@@ -46,7 +48,8 @@ class Forward: Subcommand {
 		// parse addresses and init self
 		let device1Address = try PCIAddress(from: arguments[0])
 		let device2Address = try PCIAddress(from: arguments[1])
-		try self.init(device1Address: device1Address, device2Address: device2Address)
+		let batchSize = arguments.count >= 3 ? Int(arguments[2]) : nil
+		try self.init(device1Address: device1Address, device2Address: device2Address, batchSize: batchSize)
 	}
 
 	// process/forward from -> to device using a specific queue (currently the queue is always 0)
@@ -56,7 +59,7 @@ class Forward: Subcommand {
 		let tx = to.transmitQueues[queue]
 
 		// receive packets
-		let packets = rx.fetchAvailablePackets()
+		let packets = rx.fetchAvailablePackets(limit: batchSize)
 		for packet in packets {
 			// touch each packet
 			packet.touch()
