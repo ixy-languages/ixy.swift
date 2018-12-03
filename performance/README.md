@@ -30,6 +30,16 @@ However, the FlameGraph tool can be used to create an interactive SVG for the ca
 	swift-demangle | \
 	~/FlameGraph/flamegraph.pl > ~/graph.svg`
 
+The following table gives a quick overview over the components and their time consumption in percent of the whole execution time. The percentage might result in a number greater than 100% when added, as, for example, retain/release code is still counted as part of the receive function
+
+Component | Debug | Release
+---- | ---- | ----
+Retain/Release | 22.6% | 76.1%
+Receive | 43.2% | 32.5%
+Transmit | 42.4% | 29.2
+
+The following two graphs show a more detailed view of the functions involved and their respective execution time.
+
 ![FlameGraph release](graph-release.svg)
 
 The generated flame graph for the release version (above) shows a lot of time being spent in the retain/release calls, which are part of the Automated Reference Counting (ARC) of Swift.
@@ -41,11 +51,11 @@ For a more detailed flame graph, the debug build can be used. However, the debug
 The debug flame graph shown above contains all functions without any compiler optimizations. Here, most time is spent in arbitrary functions like integer conversions and memory access with masks applied (for example when checking if a packet descriptor is done). Therefore, C-implementations were introduced for this "bottleneck" functions. Switching between the two versions is done using compiler flags, so no additional code is executed when running the application.
 
 The following measures are all for running the normal forward code with two devices, but only using the stats from one, as they are always 1/2 of the complete Mpps.  
-When using the C stand-ins in the debug build, ~0.41 Mpps are sent, for the release build it's 1.11 Mpps. However, the normal swift release build is still faster.
+When using the C stand-ins in the debug build, ~0.32 Mpps are sent, for the release build it's 2.37 Mpps. However, the normal swift release build is still faster.
 
-Another performance improvement in the C version was due to a batch cleanup of old transmit descriptors, which was subsequently implemented in the swift version. This version performed best in release mode, but similar to the normal version in debug mode.
+Another performance improvement in the C version was due to a batch cleanup of old transmit descriptors, which was subsequently implemented in the swift version. This version performed best in release mode.
 
-Combining both, the C stand-ins and the batch transmit cleanup, the debug version is somehow slower than just the C stand-in, but faster than the batch TX version. In release configuration, the performance is between only the batch tx cleanup and the C stand in version.
+Combining both, the C stand-ins and the batch transmit cleanup, the debug version is faster than its other versions. In release configuration, the performance is between only the batch tx cleanup and the C stand in version.
 
 ![Version comparison](versions.png)
 
@@ -54,7 +64,12 @@ Unfortunately, none of these alternatives were faster than the base version.
 
 ![Array comparison](arrays.png)
 
-In conclusion, the current Swift version is far slower than the other. Although three different developers with Swift experience reviewed the code, no one found bottlenecks introduced by bad programming patterns. There is nearly no dynamic dispatch in critical sections and object allocations/copies are rarely created.
+The C version includes a batch size for fetching the received packets. This feature was also implemented and tested, both in debug and release configuration.
+The graph below shows the speed of those versions, with the dashed line specifying the performance without batch sizes (dynamic arrays). Using a batch size of 256 is the fastest option in both the debug and release builds. This might be due to pre-allocating the necessary memory instead of dynamic array resizing when necessary.
+
+![Batch sizes](batch_size.png)
+
+In conclusion, the current Swift version is far slower than the other ixy projects currently available. Although three different developers with Swift experience reviewed the code, no one found bottlenecks introduced by bad programming patterns. There is nearly no dynamic dispatch in critical sections and object allocations/copies are rarely created.
 It might be possible that there are ways to improve the performance, but as the current code is quite standard Swift code, some solutions might offer better performance with the cost of having more C-like code without object-orientation.
 
 ### Used Versions
