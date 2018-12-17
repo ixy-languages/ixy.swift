@@ -48,7 +48,7 @@ For a more detailed flame graph, the debug build can be used. However, the debug
 
 ![FlameGraph release](graph-debug.svg)
 
-The debug flame graph shown above contains all functions without any compiler optimizations. Here, most time is spent in arbitrary functions like integer conversions and memory access with masks applied (for example when checking if a packet descriptor is done). Therefore, C-implementations were introduced for this "bottleneck" functions. Switching between the two versions is done using compiler flags, so no additional code is executed when running the application.
+The debug flame graph shown above contains all functions without any compiler optimizations. Here, most time is spent in arbitrary functions like integer conversions and memory access with masks applied (for example when checking if a packet descriptor is done). Therefore, C-implementations were introduced for this "bottleneck" functions (use the commit specified at the end of this document for the version including C code). Switching between the two versions is done using compiler flags, so no additional code is executed when running the application.
 
 The following measures are all for running the normal forward code with two devices, but only using the stats from one, as they are always 1/2 of the complete Mpps.  
 When using the C stand-ins in the debug build, ~0.32 Mpps are sent, for the release build it's 2.37 Mpps. However, the normal swift release build is still faster.

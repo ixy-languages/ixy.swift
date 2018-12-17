@@ -9,6 +9,11 @@ It supports Intel 82599 10GbE NICs (`ixgbe` family).
 * 100% Swift
 * No dependencies except the standard Swift libraries
 
+## Links
+
+* **[Performance Evaluation](performance/README.md)**
+* **[Used Language Features](performance/LanguageFeatures.md)**
+
 ## Build instructions
 
 Currently, only Swift 4.2 has been tested.
@@ -77,6 +82,8 @@ Examples:
 An overview over Swift language features used in this project [can be found here](performance/LanguageFeatures.md).
 
 This project is split into two parts: the app and the ixy library. The app contains the command line argument parsing and basic logic of the commands, while the ixy library handles the abstraction of the NIC.
+
+There is also a branch containing C implementations of specific functions (see Performance Evaluation for more details) named 'c\_ixy\_standins'.
 
 The code should be sufficiently documented using comments. A good place to start is [Device.swift](ixy/Sources/ixy/Device/Device.swift) in the ixy library project.
 
