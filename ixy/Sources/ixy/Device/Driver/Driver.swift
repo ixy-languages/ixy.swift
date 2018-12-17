@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import c_ixy
 
 /// abstraction for the Intel 82599 pci interface
 class Driver {

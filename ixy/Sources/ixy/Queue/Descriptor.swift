@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import c_ixy
 
 class Descriptor {
 	internal let queuePointer: UnsafeMutablePointer<UInt64>

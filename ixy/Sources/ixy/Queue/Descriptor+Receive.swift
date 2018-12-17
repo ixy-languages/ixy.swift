@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import c_ixy
 
 // MARK: - Receiving
 extension Descriptor {
@@ -18,11 +17,7 @@ extension Descriptor {
 			//return
 		}
 		self.packetPointer = packetPointer
-		#if USE_C_INT_CAST
-		queuePointer[0] = c_ixy_u64_from_pointer(self.packetPointer?.entry.pointer.physical)
-		#else
 		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
-		#endif
 		queuePointer[1] = 0
 	}
 
@@ -39,17 +34,6 @@ extension Descriptor {
 			return .unknownError;
 		}
 
-		#if USE_C_PACKET_ACCESS
-		// -- USING C PACKET ACCESS --
-		let status = c_ixy_rx_desc_ready(queuePointer)
-		if status == 0 {
-			return .notReady
-		}
-		if status == -1 {
-			return .multipacket
-		}
-		self.packetPointer = nil
-		#else
 		// -- USING SWIFT PACKET ACCESS --
 		let status = ReceiveWriteback.Status.from(queuePointer)
 		guard status.contains(.descriptorDone) else {
@@ -63,13 +47,8 @@ extension Descriptor {
 			Log.error("Multipacket unsupported", component: .rx)
 			return .multipacket
 		}
-		#endif
 
-		#if USE_C_INT_CAST
-		entry.size = c_ixy_u16_from_u32(c_ixy_rx_desc_size(queuePointer))
-		#else
 		entry.size = ReceiveWriteback.lengthFrom(queuePointer)
-		#endif
 
 		return .packet(entry)
 	}

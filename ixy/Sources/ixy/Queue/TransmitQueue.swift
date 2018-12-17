@@ -1,4 +1,3 @@
-import c_ixy
 
 public final class TransmitQueue: Queue {
 	public var lostPackets: Int = 0
