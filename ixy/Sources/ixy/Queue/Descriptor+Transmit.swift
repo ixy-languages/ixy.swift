@@ -32,6 +32,7 @@ extension Descriptor {
 		let size = UInt32(packetPointer.size)
 		let lower: UInt32 = (IXGBE_ADVTXD_DCMD_EOP | IXGBE_ADVTXD_DCMD_RS | IXGBE_ADVTXD_DCMD_IFCS | IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_DATA | size)
 		let upper: UInt32 = size << IXGBE_ADVTXD_PAYLEN_SHIFT
+		queuePointer[0] = UInt64(Int(bitPattern: packetPointer.entry.pointer.physical))
 		queuePointer[1] = UInt64((UInt64(upper) << 32) | UInt64(lower))
 	}
 }
