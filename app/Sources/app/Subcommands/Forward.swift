@@ -75,13 +75,11 @@ class Forward: Subcommand {
 	func loop() {
 		var nextTime: DispatchTime = .now() + .seconds(1)
 		var lastTime: DispatchTime = .now()
-		let finalTime: DispatchTime = .now() + .seconds(10)
 		var counter: UInt = 0
-		var continueLoop: Bool = true
 		let device1String: String = "\(device1.address)"
 		let device2String: String = "\(device1.address)"
 
-		while continueLoop {
+		while true {
 			// forward the packets
 			process(from: device1, to: device2, queue: 0)
 			process(from: device2, to: device1, queue: 0)
@@ -109,9 +107,6 @@ class Forward: Subcommand {
 
 					lastTime = .now()
 					nextTime = .now() + .seconds(1)
-				}
-				if time > finalTime {
-					continueLoop = false
 				}
 				counter = 0
 			}
