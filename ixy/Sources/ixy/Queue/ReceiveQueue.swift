@@ -30,15 +30,13 @@ public struct ReceiveQueue {
 		let lastRxIndex = self.queue.tailIndex
 		// split using if else to reduce unnecessary overhead
 		if var remaining = limit {
-			var tmpDescriptor = self.queue.descriptors[self.queue.tailIndex]
-			while remaining > 0, process(descriptor: &tmpDescriptor) {
+			while remaining > 0, process(index: self.queue.tailIndex) {
 				lastIndex = self.queue.tailIndex
 				self.queue.tailIndex ++< self.queue.descriptors.count
 				remaining -= 1
 			}
 		} else {
-			var tmpDescriptor = self.queue.descriptors[self.queue.tailIndex]
-			while process(descriptor: &tmpDescriptor) {
+			while process(index: self.queue.tailIndex) {
 				lastIndex = self.queue.tailIndex
 				self.queue.tailIndex ++< self.queue.descriptors.count
 			}
@@ -47,6 +45,26 @@ public struct ReceiveQueue {
 		// update register if necessary
 		if lastRxIndex != self.queue.tailIndex {
 			self.queue.driver.update(receiveQueue: self, tailIndex: UInt32(lastIndex))
+		}
+	}
+
+	mutating func process(index: Int) -> Bool {
+		switch self.queue.descriptors[index].receivePacket() {
+		case .notReady:
+			Log.debug("Packet not ready", component: .rx)
+			return false
+		case .unknownError, .multipacket:
+			// although there has been an error, in order to keep the queue from blocking
+			receivedPackets += 1
+			self.queue.descriptors[index].prepareForReceiving()
+			return true
+		case .packet(let packet):
+			// append the packet to our available packets buffer
+			receivedPackets += 1
+			availablePackets.append(packet)
+			// prepare the descriptor for reuse -> fetch new packet buffer etc
+			self.queue.descriptors[index].prepareForReceiving()
+			return true
 		}
 	}
 
@@ -72,16 +90,16 @@ public struct ReceiveQueue {
 
 	mutating func start() {
 		Log.debug("Starting \(self.queue.index)", component: .rx)
-		for var descriptor in self.queue.descriptors {
-			descriptor.prepareForReceiving()
+		for indx in 0..<self.queue.descriptors.count {
+			self.queue.descriptors[indx].prepareForReceiving()
 		}
 		self.queue.driver.start(receiveQueue: self)
 	}
 
-	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> ReceiveQueue {
 		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
 		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
-		return try self.init(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
+		return try ReceiveQueue(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
 

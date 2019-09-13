@@ -41,8 +41,8 @@ public struct TransmitQueue {
 
 		if freeUnused && txCount < packets.count {
 			var freed: Int = 0
-			for var packet in packets[txCount..<packets.count] {
-				packet.free()
+			for indx in txCount..<packets.count {
+				packets[indx].free()
 				freed += 1
 			}
 		}
@@ -52,16 +52,19 @@ public struct TransmitQueue {
 
 	mutating func start() {
 		Log.debug("Starting \(self.queue.index)", component: .tx)
-		for var descriptor in self.queue.descriptors {
-			descriptor.cleanUp()
+		for indx in 0..<self.queue.descriptors.count {
+			self.queue.descriptors[indx].cleanUp()
 		}
 		self.queue.driver.start(transmitQueue: self)
 	}
 
 	private mutating func cleanUp() {
 		// iterate over descriptors and clean up, adjusting the head index
-		var tmpDescriptor = self.queue.descriptors[self.queue.headIndex]
-		while cleanUp(descriptor: &tmpDescriptor) {
+		//var tmpDescriptor = self.queue.descriptors[self.queue.headIndex]
+		/*while cleanUp(descriptor: &tmpDescriptor) {
+			self.queue.headIndex ++< self.queue.descriptors.count
+		}*/
+		while cleanUp(index: self.queue.headIndex) {
 			self.queue.headIndex ++< self.queue.descriptors.count
 		}
 	}
@@ -98,6 +101,24 @@ public struct TransmitQueue {
 		}
 	}
 
+	private mutating func cleanUp(index: Int) -> Bool {
+		// check if head < tail
+		guard self.queue.headIndex != self.queue.tailIndex else {
+			Log.debug("head \(self.queue.headIndex) = tail \(self.queue.tailIndex). cleanup done", component: .tx)
+			return false
+		}
+		// check if transmitted
+		guard self.queue.descriptors[index].transmitted else {
+			Log.debug("[\(self.queue.descriptors[index].packetPointer?.id ?? -1)] packet not yet transmitted", component: .tx)
+			return false
+		}
+		// cleanup and update stats
+		Log.debug("[\(self.queue.descriptors[index].packetPointer?.id ?? -1)] packet was transmitted", component: .tx)
+		self.queue.descriptors[index].cleanUpTransmitted()
+		sentPackets += 1
+		return true
+	}
+
 	private mutating func cleanUp(descriptor: inout Descriptor) -> Bool {
 		// check if head < tail
 		guard self.queue.headIndex != self.queue.tailIndex else {
@@ -116,10 +137,10 @@ public struct TransmitQueue {
 		return true
 	}
 
-	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> TransmitQueue {
 		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
 		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
-		return try self.init(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
+		return try TransmitQueue(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
 

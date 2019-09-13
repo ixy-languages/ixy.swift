@@ -39,9 +39,9 @@ public struct Queue {
 		
 	}
 
-	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Queue {
 		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
 		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
-		return try self.init(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
+		return try Queue(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
