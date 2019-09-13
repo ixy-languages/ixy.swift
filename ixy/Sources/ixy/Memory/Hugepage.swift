@@ -18,7 +18,7 @@ struct Hugepage {
 		return try? DMAMemory(virtual: self.address)
 	}()
 	
-	static let pageId: Atomic<Int> = Atomic(value: 0)
+	static var pageId: Atomic<Int> = Atomic(value: 0)
 
 	enum Error: Swift.Error {
 		case contiguousMultipageNotSupported

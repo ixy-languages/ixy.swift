@@ -31,19 +31,19 @@ extension Driver {
 
 	static func enableDMA(address: PCIAddress) throws {
 		let path = address.path + "/config"
-		guard let file = try? File(path: path, flags: O_RDWR) else {
+		guard var file = try? File(path: path, flags: O_RDWR) else {
 			throw Error.unbindError
 		}
 
 		file[4] |= (1 << 2) as UInt16;
 	}
 
-	func resetAndInit() {
+	mutating func resetAndInit() {
 		reset()
 		initDevice()
 	}
 
-	func reset() {
+	mutating func reset() {
 		Log.info("Resetting \(address)", component: .driver)
 		// section 4.6.3.1 - disable all interrupts
 		self[IXGBE_EIMC] = 0x7FFFFFFF
@@ -57,7 +57,7 @@ extension Driver {
 		self[IXGBE_EIMC] = 0x7FFFFFFF
 	}
 
-	func initDevice() {
+	mutating func initDevice() {
 		Log.info("Initializing \(address)", component: .driver)
 
 		self.wait(until: IXGBE_EEC, didSetMask: IXGBE_EEC_ARD)
@@ -66,14 +66,14 @@ extension Driver {
 		initLink()
 	}
 
-	func initLink() {
+	mutating func initLink() {
 		self[IXGBE_AUTOC] = (self[IXGBE_AUTOC] & ~IXGBE_AUTOC_LMS_MASK) | IXGBE_AUTOC_LMS_10G_SERIAL
 		self[IXGBE_AUTOC] = (self[IXGBE_AUTOC] & ~IXGBE_AUTOC_10G_PMA_PMD_MASK) | IXGBE_AUTOC_10G_XAUI
 
 		self[IXGBE_AUTOC] |= IXGBE_AUTOC_AN_RESTART
 	}
 
-	func initReceive(queues: [ReceiveQueue]) {
+	mutating func initReceive(queues: [ReceiveQueue]) {
 		self[IXGBE_RXCTRL] &= ~IXGBE_RXCTRL_RXEN
 
 		let bufferSizes: [UInt32] = [IXGBE_RXPBSIZE_128KB] + Array<UInt32>(repeating: 0, count: 7)
@@ -99,7 +99,7 @@ extension Driver {
 		self[IXGBE_RXCTRL] |= IXGBE_RXCTRL_RXEN
 	}
 
-	func initReceive(for queue: ReceiveQueue, atIndex index: Int) {
+	mutating func initReceive(for receiveQueue: ReceiveQueue, atIndex index: Int) {
 		Log.debug("Initializing receive queue \(index)", component: .driver)
 		// enable advanced rx descriptors, we could also get away with legacy descriptors, but they aren't really easier
 		let i = UInt32(index)
@@ -110,7 +110,7 @@ extension Driver {
 		self[IXGBE_SRRCTL(i)] |= IXGBE_SRRCTL_DROP_EN
 
 //		// setup descriptor ring, see section 7.1.9
-		let address: UInt64 = UInt64(Int(bitPattern: queue.address.physical))
+		let address: UInt64 = UInt64(Int(bitPattern: receiveQueue.queue.address.physical))
 		self[IXGBE_RDBAL(i)] = UInt32(address & (0xFFFFFFFF as UInt64))
 		self[IXGBE_RDBAH(i)] = UInt32(address >> 32)
 		self[IXGBE_RDLEN(i)] = UInt32(Constants.Queue.ringSizeBytes)
@@ -121,7 +121,7 @@ extension Driver {
 		self[IXGBE_RDT(i)] = 0
 	}
 
-	func initTransmit(queues: [TransmitQueue]) {
+	mutating func initTransmit(queues: [TransmitQueue]) {
 		self[IXGBE_HLREG0] |= IXGBE_HLREG0_TXCRCEN | IXGBE_HLREG0_TXPADEN
 
 
@@ -140,12 +140,12 @@ extension Driver {
 		self[IXGBE_DMATXCTL] = IXGBE_DMATXCTL_TE
 	}
 
-	func initTransmit(for queue: TransmitQueue, atIndex index: Int) {
+	mutating func initTransmit(for transmitQueue: TransmitQueue, atIndex index: Int) {
 		Log.debug("Initializing transmit queue \(index)", component: .driver)
 
 		let i = UInt32(index)
 
-		let address: UInt64 = UInt64(Int(bitPattern: queue.address.physical))
+		let address: UInt64 = UInt64(Int(bitPattern: transmitQueue.queue.address.physical))
 		self[IXGBE_TDBAL(i)] = UInt32(address & (0xFFFFFFFF as UInt64))
 		self[IXGBE_TDBAH(i)] = UInt32(address >> 32)
 		self[IXGBE_TDLEN(i)] = UInt32(Constants.Queue.ringSizeBytes)

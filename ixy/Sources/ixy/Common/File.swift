@@ -1,7 +1,7 @@
 import Foundation
 
 /// a simple file wrapper class, which uses file descriptors to access the file
-internal class File {
+internal struct File {
 	internal var fd: Int32
 	internal var closeOnDealloc: Bool
 	internal var path: String?
@@ -33,11 +33,11 @@ internal class File {
 		self.path = path
 	}
 
-	deinit {
+	/*deinit {
 		if closeOnDealloc {
-			close(fd)
+			close(fd)//fixme: close file descriptor
 		}
-	}
+	}*/
 }
 
 // Read Support

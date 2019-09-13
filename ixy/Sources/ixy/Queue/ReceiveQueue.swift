@@ -1,14 +1,19 @@
 
-public final class ReceiveQueue : Queue {
+public struct ReceiveQueue {
+	var queue : Queue
 	private var availablePackets: [DMAMempool.Pointer] = []
 
 	public var receivedPackets: Int = 0
 
+	init(index: UInt, memory: MemoryMap, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
+		try self.queue = Queue(index: index, memory: memory, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
+	}
+	
 	/// fetches available packet from the ring buffer and returns them
 	///
 	/// - Parameter limit: optionally limit the packet count
 	/// - Returns: array of packets
-	public func fetchAvailablePackets(limit: Int? = nil) -> [DMAMempool.Pointer] {
+	public mutating func fetchAvailablePackets(limit: Int? = nil) -> [DMAMempool.Pointer] {
 		self.availablePackets = []
 		if let limit = limit {
 			availablePackets.reserveCapacity(limit)
@@ -20,30 +25,32 @@ public final class ReceiveQueue : Queue {
 		return packets
 	}
 
-	func processBatch(limit: Int? = nil) {
-		var lastIndex = tailIndex
-		let lastRxIndex = tailIndex
+	mutating func processBatch(limit: Int? = nil) {
+		var lastIndex = self.queue.tailIndex
+		let lastRxIndex = self.queue.tailIndex
 		// split using if else to reduce unnecessary overhead
 		if var remaining = limit {
-			while remaining > 0, process(descriptor: descriptors[tailIndex]) {
-				lastIndex = tailIndex
-				tailIndex ++< descriptors.count
+			var tmpDescriptor = self.queue.descriptors[self.queue.tailIndex]
+			while remaining > 0, process(descriptor: &tmpDescriptor) {
+				lastIndex = self.queue.tailIndex
+				self.queue.tailIndex ++< self.queue.descriptors.count
 				remaining -= 1
 			}
 		} else {
-			while process(descriptor: descriptors[tailIndex]) {
-				lastIndex = tailIndex
-				tailIndex ++< descriptors.count
+			var tmpDescriptor = self.queue.descriptors[self.queue.tailIndex]
+			while process(descriptor: &tmpDescriptor) {
+				lastIndex = self.queue.tailIndex
+				self.queue.tailIndex ++< self.queue.descriptors.count
 			}
 		}
 
 		// update register if necessary
-		if lastRxIndex != tailIndex {
-			self.driver.update(queue: self, tailIndex: UInt32(lastIndex))
+		if lastRxIndex != self.queue.tailIndex {
+			self.queue.driver.update(receiveQueue: self, tailIndex: UInt32(lastIndex))
 		}
 	}
 
-	func process(descriptor: Descriptor) -> Bool {
+	mutating func process(descriptor: inout Descriptor) -> Bool {
 		switch descriptor.receivePacket() {
 		case .notReady:
 			Log.debug("Packet not ready", component: .rx)
@@ -63,12 +70,18 @@ public final class ReceiveQueue : Queue {
 		}
 	}
 
-	override func start() {
-		Log.debug("Starting \(self.index)", component: .rx)
-		for descriptor in self.descriptors {
+	mutating func start() {
+		Log.debug("Starting \(self.queue.index)", component: .rx)
+		for var descriptor in self.queue.descriptors {
 			descriptor.prepareForReceiving()
 		}
-		driver.start(queue: self)
+		self.queue.driver.start(receiveQueue: self)
+	}
+
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> Self {
+		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
+		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
+		return try self.init(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
 

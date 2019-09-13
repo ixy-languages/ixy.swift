@@ -12,21 +12,21 @@ extension Descriptor {
 		return /*self.packetPointer != nil &&*/ TransmitWriteback.done(queuePointer)
 	}
 
-	internal func cleanUp() {
+	internal mutating func cleanUp() {
 		self.queuePointer[0] = 0
 		self.queuePointer[1] = 0
 		self.packetPointer = nil
 	}
 
-	func cleanUpTransmitted() {
+	mutating func cleanUpTransmitted() {
 		self.queuePointer[0] = 0
 		self.queuePointer[1] = 0
-		guard let packetPointer = self.packetPointer else { Log.warn("No packet pointer", component: .tx); fatalError("oops") }
+		guard var packetPointer = self.packetPointer else { Log.warn("No packet pointer", component: .tx); fatalError("oops") }
 		packetPointer.free()
 		self.packetPointer = nil
 	}
 
-	func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
+	mutating func scheduleForTransmission(packetPointer: DMAMempool.Pointer) {
 		self.packetPointer = packetPointer
 		assert(queuePointer[0] == 0, "Queue pointer not clean!")
 		let size = UInt32(packetPointer.size)

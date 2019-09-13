@@ -8,8 +8,8 @@
 import Foundation
 
 extension Driver {
-	internal func start(queue: ReceiveQueue) {
-		let index = UInt32(queue.index)
+	internal mutating func start(receiveQueue: ReceiveQueue) {
+		let index = UInt32(receiveQueue.queue.index)
 		let rxdctl = IXGBE_RXDCTL(index)
 		
 		self[rxdctl] |= IXGBE_RXDCTL_ENABLE
@@ -17,15 +17,15 @@ extension Driver {
 
 		self[IXGBE_RDH(index)] = 0
 		//self[IXGBE_RDT(index)] = UInt32(queue.descriptors.count - 1)
-		self.update(queue: queue, tailIndex: UInt32(queue.descriptors.count - 1))
+		self.update(receiveQueue: receiveQueue, tailIndex: UInt32(receiveQueue.queue.descriptors.count - 1))
 	}
 
-	func getHeadIndex(queue: ReceiveQueue) -> UInt32 {
-		return self[IXGBE_RDH(UInt32(queue.index))]
+	func getHeadIndex(receiveQueue: ReceiveQueue) -> UInt32 {
+		return self[IXGBE_RDH(UInt32(receiveQueue.queue.index))]
 	}
 
-	internal func start(queue: TransmitQueue) {
-		let index = UInt32(queue.index)
+	internal mutating func start(transmitQueue: TransmitQueue) {
+		let index = UInt32(transmitQueue.queue.index)
 
 		self[IXGBE_TDH(index)] = 0
 		self[IXGBE_TDT(index)] = 0
@@ -35,11 +35,11 @@ extension Driver {
 		wait(until: txdctl, didSetMask: IXGBE_TXDCTL_ENABLE)
 	}
 
-	internal func update(queue: ReceiveQueue, tailIndex: UInt32) {
-		self[IXGBE_RDT(UInt32(queue.index))] = tailIndex
+	internal mutating func update(receiveQueue: ReceiveQueue, tailIndex: UInt32) {
+		self[IXGBE_RDT(UInt32(receiveQueue.queue.index))] = tailIndex
 	}
 
-	internal func update(queue: TransmitQueue, tailIndex: UInt32) {
-		self[IXGBE_TDT(UInt32(queue.index))] = tailIndex
+	internal mutating func update(transmitQueue: TransmitQueue, tailIndex: UInt32) {
+		self[IXGBE_TDT(UInt32(transmitQueue.queue.index))] = tailIndex
 	}
 }

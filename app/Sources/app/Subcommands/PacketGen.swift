@@ -29,17 +29,19 @@ class PacketGen: Subcommand {
 
 	func loop() {
 		while(true) {
-			let packets = device.receiveQueues[0].fetchAvailablePackets()
+			var tmpReceiveQueue = device.receiveQueues[0]
+			let packets = tmpReceiveQueue.fetchAvailablePackets()
 
 			if packets.count > 0 {
 				Log.log("Got \(packets.count) packets", level: .info, component: "app")
 			}
 			
-			let tx = device.transmitQueues[0]
+			var tx = device.transmitQueues[0]
 			guard let packet = tx.createDummyPacket() else {
 				fatalError("no packet available")
 			}
-			_ = tx.transmit([packet])
+			var tmpPacket = [packet]
+			_ = tx.transmit(&tmpPacket)
 
 			sleep(1)
 		}

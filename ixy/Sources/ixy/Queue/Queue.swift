@@ -1,12 +1,12 @@
 
 /// base class for a queue
-public class Queue {
+public struct Queue {
 	private let memory: MemoryMap
-	internal let packetMempool: DMAMempool
-	internal let descriptors: [Descriptor]
+	internal var packetMempool: DMAMempool
+	internal var descriptors: [Descriptor]
 	internal var tailIndex: Int = 0
 	internal var headIndex: Int = 0
-	internal let driver: Driver
+	internal var driver: Driver
 	internal let index: UInt
 
 	internal let address: DMAMemory
@@ -16,7 +16,7 @@ public class Queue {
 		case memoryError
 	}
 
-	required init(index: UInt, memory: MemoryMap, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
+	init(index: UInt, memory: MemoryMap, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
 		self.memory = memory
 		self.packetMempool = packetMempool
 		self.driver = driver

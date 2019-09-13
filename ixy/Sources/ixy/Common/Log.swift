@@ -8,7 +8,7 @@
 import Foundation
 
 /// basic logger with debug/info/warn/error levels and some components
-public final class Log {
+public struct Log {
 	static public var enableColors: Bool = true
 	static var componentLength: Int? = 6 {
 		didSet {
