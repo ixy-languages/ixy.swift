@@ -8,7 +8,7 @@
 import Foundation
 
 /// Generic wrapper for accessing an object atomically
-public final class Atomic<T> {
+public struct Atomic<T> {
 	private let lock = DispatchSemaphore(value: 1)
 	private var _value: T
 
@@ -32,7 +32,7 @@ public final class Atomic<T> {
 	/// mutate the value suing a block
 	///
 	/// - Parameter transform: the block which can mutate the value
-	public func mutate(_ transform: (inout T) -> Void) {
+	public mutating func mutate(_ transform: (inout T) -> Void) {
 		lock.wait()
 		defer { lock.signal() }
 		transform(&_value)
@@ -41,7 +41,7 @@ public final class Atomic<T> {
 
 // MARK: - Extension for Strideable types, which offer the possibility to be incremented
 extension Atomic where T: Strideable {
-	public func increment(by: T.Stride = 1) -> T {
+	public mutating func increment(by: T.Stride = 1) -> T {
 		lock.wait()
 		defer { lock.signal() }
 		_value = _value.advanced(by: by)

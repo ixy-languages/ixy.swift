@@ -1,6 +1,6 @@
 
 /// the base class for the Intel 82599
-public class Device {
+public struct Device {
 	public let address: PCIAddress
 	public let receiveQueueCount: UInt
 	public let transmitQueueCount: UInt
@@ -55,7 +55,7 @@ public class Device {
 		return (packetMempool, packetHugepage.memoryMap)
 	}
 
-	public func open() throws {
+	public mutating func open() throws {
 		// perform various steps to open and initialize the device (method names should be self-explanatory)
 		try createReceiveQueues()
 		try createTransmitQueues()
@@ -65,8 +65,12 @@ public class Device {
 
 		self.driver.initReceive(queues: self.receiveQueues)
 		self.driver.initTransmit(queues: self.transmitQueues)
-		self.receiveQueues.forEach({ $0.start() })
-		self.transmitQueues.forEach({ $0.start() })
+		for var receiveQueue in self.receiveQueues{
+			receiveQueue.start()
+		}
+		for var transmitQueue in self.transmitQueues{ 
+			transmitQueue.start()
+		}
 		self.driver.promiscuousMode = true
 
 		try self.driver.waitForLink()
@@ -89,7 +93,7 @@ public class Device {
 	}
 
 	internal var stats: DeviceStats = DeviceStats(transmittedPackets: 0, transmittedBytes: 0, receivedPackets: 0, receivedBytes: 0)
-	public func fetchStats() -> DeviceStats {
+	public mutating func fetchStats() -> DeviceStats {
 		let newStats = self.driver.readStats()
 		self.stats += newStats
 		return self.stats
@@ -99,14 +103,14 @@ public class Device {
 		return self.driver.readStats()
 	}
 
-	internal func createReceiveQueues() throws {
+	internal mutating func createReceiveQueues() throws {
 		let driver = self.driver
 		self.receiveQueues = try (0..<self.receiveQueueCount).map { (Idx) -> ReceiveQueue in
 			return try ReceiveQueue.withHugepageMemory(index: Idx, packetMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)
 		}
 	}
 
-	internal func createTransmitQueues() throws {
+	internal mutating func createTransmitQueues() throws {
 		let driver = self.driver
 		self.transmitQueues = try (0..<self.transmitQueueCount).map { (Idx) -> TransmitQueue in
 			return try TransmitQueue.withHugepageMemory(index: Idx, packetMempool: self.packetMempool, descriptorCount: Constants.Queue.ringEntryCount, driver: driver)

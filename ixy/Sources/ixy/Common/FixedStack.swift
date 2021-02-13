@@ -8,7 +8,7 @@
 import Foundation
 
 /// a generic fixed stack implementation which can be used as a stand in for an array, to check performance
-class FixedStack<T> {
+struct FixedStack<T> {
 	var objects: [T?]
 	var top: Int = 0
 
@@ -22,19 +22,19 @@ class FixedStack<T> {
 		self.top = -1
 	}
 
-	func initialize(from objects: [T]) {
+	mutating func initialize(from objects: [T]) {
 		for object in objects {
 			self.push(object)
 		}
 	}
 
-	func push(_ object: T) {
+	mutating func push(_ object: T) {
 		assert(top < objects.count, "stack unbalanced push")
 		top += 1
 		objects[top] = object
 	}
 
-	func pop() -> T? {
+	mutating func pop() -> T? {
 		assert(top >= 0, "stack unbalanced pop")
 		let object = objects[top]
 		objects[top] = nil

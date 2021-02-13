@@ -30,7 +30,8 @@ class Simple: Subcommand {
 	func loop() {
 		nextTime = .now() + .seconds(1)
 		while(true) {
-			let packets = device.receiveQueues[0].fetchAvailablePackets()
+			var tmpReceiveQueue = device.receiveQueues[0]
+			var packets = tmpReceiveQueue.fetchAvailablePackets()
 
 			if packets.count > 0 {
 				Log.log("Got \(packets.count) packets", level: .info, component: "app")
@@ -40,7 +41,8 @@ class Simple: Subcommand {
 				}
 			}
 
-			_ = device.transmitQueues[0].transmit(packets)
+			var tmpTransmitQueue = device.transmitQueues[0]
+			_ = tmpTransmitQueue.transmit(&packets)
 
 			sleep(1)
 

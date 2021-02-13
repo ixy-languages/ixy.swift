@@ -8,18 +8,19 @@
 import Foundation
 
 /// simple wrapper class based on file for a pci device
-internal class DeviceConfig: File {
+internal struct DeviceConfig {
+	let file: File
 	internal init(address: PCIAddress) throws {
 		let path = address.path + "/config"
-		try super.init(path: path, flags: O_RDONLY)
+		try file = File(path: path, flags: O_RDONLY)
 	}
 
 	var vendorID: UInt16 {
-		return (try? self.read(offset: 0x00)) ?? 0
+		return (try? file.read(offset: 0x00)) ?? 0
 	}
 
 	var deviceID: UInt16 {
-		return (try? self.read(offset: 0x02)) ?? 0
+		return (try? file.read(offset: 0x02)) ?? 0
 	}
 
 	var classCode: UInt32 {
@@ -28,7 +29,7 @@ internal class DeviceConfig: File {
 			// Datasheet P755
 			// Register at 0x08 = [RevID:8][ClassCode:24]
 			// -> read from 0x08 but discard first 8 bits
-			try code = self.read(offset: 0x08)
+			try code = file.read(offset: 0x08)
 			code = ((code >> 8) & 0xFF_FFFF)
 		} catch {
 			code = 0

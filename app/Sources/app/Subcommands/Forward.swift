@@ -55,18 +55,18 @@ class Forward: Subcommand {
 	// process/forward from -> to device using a specific queue (currently the queue is always 0)
 	private func process(from: Device, to: Device, queue: Int) {
 		// get queues
-		let rx = from.receiveQueues[queue]
-		let tx = to.transmitQueues[queue]
+		var rx = from.receiveQueues[queue]
+		var tx = to.transmitQueues[queue]
 
 		// receive packets
-		let packets = rx.fetchAvailablePackets(limit: batchSize)
+		var packets = rx.fetchAvailablePackets(limit: batchSize)
 		for packet in packets {
 			// touch each packet
 			packet.touch()
 		}
 
 		// transmit packets
-		let sentPackets = tx.transmit(packets, freeUnused: true)
+		let sentPackets = tx.transmit(&packets, freeUnused: true)
 
 		// keep track of lost packets due if not enough tx descriptors are available
 		lost += (packets.count - sentPackets)
