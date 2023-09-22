@@ -151,7 +151,7 @@ extension Driver {
 		self[IXGBE_TDLEN(i)] = UInt32(Constants.Queue.ringSizeBytes)
 
 		var txdctl = self[IXGBE_TXDCTL(i)]
-		txdctl &= ~(0x3F | (0x3F << 8) | (0x3f << 16))
+		txdctl &= ~(0x7F | (0x7F << 8) | (0x7f << 16))
 		txdctl |= (36 | (8 << 8) | (4 << 16))
 		self[IXGBE_TXDCTL(i)] = txdctl
 	}
