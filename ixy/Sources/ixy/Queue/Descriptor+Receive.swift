@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Receiving
 extension Descriptor {
-	func prepareForReceiving() {
+	mutating func prepareForReceiving() {
 		// allocate new mempool entry if necessary
 		guard self.packetPointer == nil, let packetPointer = self.packetMempool.getFreePointer() else {
 			Log.warn("Couldn't alloc space for packet", component: .rx)
@@ -28,8 +28,8 @@ extension Descriptor {
 		case packet(DMAMempool.Pointer)
 	}
 
-	func receivePacket() -> ReceiveResponse {
-		guard let entry = self.packetPointer else {
+	mutating func receivePacket() -> ReceiveResponse {
+		guard var entry = self.packetPointer else {
 			Log.error("No packet pointer", component: .rx)
 			return .unknownError;
 		}

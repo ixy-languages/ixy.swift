@@ -8,7 +8,7 @@
 import Foundation
 
 /// abstraction for the Intel 82599 pci interface
-class Driver {
+struct Driver {
 	internal let address: PCIAddress
 	private let resource: UnsafeMutableRawPointer
 	private let mmap: MemoryMap

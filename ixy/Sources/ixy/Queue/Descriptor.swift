@@ -7,10 +7,10 @@
 
 import Foundation
 
-class Descriptor {
+struct Descriptor {
 	internal let queuePointer: UnsafeMutablePointer<UInt64>
 	internal var packetPointer: DMAMempool.Pointer?
-	internal let packetMempool: DMAMempool
+	internal var packetMempool: DMAMempool
 
 	init(queuePointer: UnsafeMutablePointer<UInt64>, mempool: DMAMempool) {
 		self.queuePointer = queuePointer

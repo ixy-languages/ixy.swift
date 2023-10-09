@@ -9,13 +9,15 @@ import Foundation
 
 /// simple subclass for the pagemap file with easy initializiation based on Constants.pagemapPath and conversion
 /// from virtual to physical pointer
-class Pagemap: File {
+struct Pagemap: ~Copyable {
+	let file: File
 	static var pagesize: UInt = {
 		return UInt(sysconf(Int32(_SC_PAGESIZE)))
 	}()
 
 	init() throws {
-		try super.init(path: Constants.pagemapPath, flags: O_RDONLY)
+		try file = File(path: Constants.pagemapPath, flags: O_RDONLY)
+		//try super.init(path: Constants.pagemapPath, flags: O_RDONLY)
 	}
 
 	func physical(from virtual: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer? {
@@ -23,7 +25,7 @@ class Pagemap: File {
 		// TODO: check if correct calculation due to possible precedence differences!
 		let offset: off_t = off_t(virtualIntAddress / Pagemap.pagesize * UInt(MemoryLayout<Int>.size))
 		do {
-			let pageNumber: UInt = try self.read(offset: offset)
+			let pageNumber: UInt = try file.read(offset: offset)
 			// TODO: check if correct calculation due to possible precedence differences!
 			let physicalIntAddress = ((pageNumber & 0x7f_ffff_ffff_ffff) * Pagemap.pagesize) + (virtualIntAddress % Pagemap.pagesize)
 			let physical = UnsafeMutableRawPointer(bitPattern: physicalIntAddress)

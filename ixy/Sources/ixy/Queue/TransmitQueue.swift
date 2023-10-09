@@ -1,7 +1,12 @@
 
-public final class TransmitQueue: Queue {
+public struct TransmitQueue {
+	var queue : Queue
 	public var lostPackets: Int = 0
 	public var sentPackets: Int = 0
+
+	init(index: UInt, memory: MemoryMap, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws {
+		try self.queue = Queue(index: index, memory: memory, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
+	}
 
 	/// adds the packets to the transmit buffer
 	///
@@ -9,35 +14,35 @@ public final class TransmitQueue: Queue {
 	///   - packets: the packets to add
 	///   - freeUnused: if true, packets that can't be added will be automatically freed
 	/// - Returns: the number of added packets
-	public func transmit(_ packets: [DMAMempool.Pointer], freeUnused: Bool = true) -> Int {
+	public mutating func transmit(_ packets: inout [DMAMempool.Pointer], freeUnused: Bool = true) -> Int {
 		#if USE_BATCH_TX_CLEAN
 		cleanUpBatch()
 		#else
 		cleanUp()
 		#endif
 
-		var nextIndex: Int = tailIndex
-		let oldIndex: Int = tailIndex
+		var nextIndex: Int = self.queue.tailIndex
+		let oldIndex: Int = self.queue.tailIndex
 
 		var txCount: Int = 0
 		for packet in packets {
-			nextIndex ++< descriptors.count
-			guard nextIndex != headIndex else {
+			nextIndex ++< self.queue.descriptors.count
+			guard nextIndex != self.queue.headIndex else {
 				break
 			}
-			self.descriptors[tailIndex].scheduleForTransmission(packetPointer: packet)
+			self.queue.descriptors[self.queue.tailIndex].scheduleForTransmission(packetPointer: packet)
 			txCount += 1
-			tailIndex ++< descriptors.count
+			self.queue.tailIndex ++< self.queue.descriptors.count
 		}
 
-		if oldIndex != tailIndex {
-			self.driver.update(queue: self, tailIndex: UInt32(tailIndex))
+		if oldIndex != self.queue.tailIndex {
+			self.queue.driver.update(transmitQueue: self, tailIndex: UInt32(self.queue.tailIndex))
 		}
 
 		if freeUnused && txCount < packets.count {
 			var freed: Int = 0
-			for packet in packets[txCount..<packets.count] {
-				packet.free()
+			for indx in txCount..<packets.count {
+				packets[indx].free()
 				freed += 1
 			}
 		}
@@ -45,57 +50,79 @@ public final class TransmitQueue: Queue {
 		return txCount
 	}
 
-	override func start() {
-		Log.debug("Starting \(self.index)", component: .tx)
-		for descriptor in descriptors {
-			descriptor.cleanUp()
+	mutating func start() {
+		Log.debug("Starting \(self.queue.index)", component: .tx)
+		for indx in 0..<self.queue.descriptors.count {
+			self.queue.descriptors[indx].cleanUp()
 		}
-		driver.start(queue: self)
+		self.queue.driver.start(transmitQueue: self)
 	}
 
-	private func cleanUp() {
+	private mutating func cleanUp() {
 		// iterate over descriptors and clean up, adjusting the head index
-		while cleanUp(descriptor: descriptors[headIndex]) {
-			headIndex ++< descriptors.count
+		//var tmpDescriptor = self.queue.descriptors[self.queue.headIndex]
+		/*while cleanUp(descriptor: &tmpDescriptor) {
+			self.queue.headIndex ++< self.queue.descriptors.count
+		}*/
+		while cleanUp(index: self.queue.headIndex) {
+			self.queue.headIndex ++< self.queue.descriptors.count
 		}
 	}
 
-	private func cleanUpBatch() {
+	private mutating func cleanUpBatch() {
 		while true {
-			var cleanable: Int = tailIndex - headIndex
+			var cleanable: Int = self.queue.tailIndex - self.queue.headIndex
 			if cleanable < 0 {
-				cleanable = descriptors.count + cleanable
+				cleanable = self.queue.descriptors.count + cleanable
 			}
 			if cleanable < 32 {
 				break
 			}
-			var cleanup_to: Int = headIndex + 32 - 1
-			if cleanup_to >= descriptors.count {
-				cleanup_to -= descriptors.count
+			var cleanup_to: Int = self.queue.headIndex + 32 - 1
+			if cleanup_to >= self.queue.descriptors.count {
+				cleanup_to -= self.queue.descriptors.count
 			}
 
-			if descriptors[cleanup_to].transmitted {
-				var i: Int = headIndex
+			if self.queue.descriptors[cleanup_to].transmitted {
+				var i: Int = self.queue.headIndex
 				while true {
-					descriptors[i].cleanUpTransmitted()
+					self.queue.descriptors[i].cleanUpTransmitted()
 					if i == cleanup_to {
 						break
 					}
-					i ++< descriptors.count
+					i ++< self.queue.descriptors.count
 				}
 				sentPackets += 32
 			} else {
 				break
 			}
-			headIndex = cleanup_to
-			headIndex ++< descriptors.count
+			self.queue.headIndex = cleanup_to
+			self.queue.headIndex ++< self.queue.descriptors.count
 		}
 	}
 
-	private func cleanUp(descriptor: Descriptor) -> Bool {
+	private mutating func cleanUp(index: Int) -> Bool {
 		// check if head < tail
-		guard headIndex != tailIndex else {
-			Log.debug("head \(headIndex) = tail \(tailIndex). cleanup done", component: .tx)
+		guard self.queue.headIndex != self.queue.tailIndex else {
+			Log.debug("head \(self.queue.headIndex) = tail \(self.queue.tailIndex). cleanup done", component: .tx)
+			return false
+		}
+		// check if transmitted
+		guard self.queue.descriptors[index].transmitted else {
+			Log.debug("[\(self.queue.descriptors[index].packetPointer?.id ?? -1)] packet not yet transmitted", component: .tx)
+			return false
+		}
+		// cleanup and update stats
+		Log.debug("[\(self.queue.descriptors[index].packetPointer?.id ?? -1)] packet was transmitted", component: .tx)
+		self.queue.descriptors[index].cleanUpTransmitted()
+		sentPackets += 1
+		return true
+	}
+
+	private mutating func cleanUp(descriptor: inout Descriptor) -> Bool {
+		// check if head < tail
+		guard self.queue.headIndex != self.queue.tailIndex else {
+			Log.debug("head \(self.queue.headIndex) = tail \(self.queue.tailIndex). cleanup done", component: .tx)
 			return false
 		}
 		// check if transmitted
@@ -108,6 +135,12 @@ public final class TransmitQueue: Queue {
 		descriptor.cleanUpTransmitted()
 		sentPackets += 1
 		return true
+	}
+
+	static func withHugepageMemory(index: UInt, packetMempool: DMAMempool, descriptorCount: UInt, driver: Driver) throws -> TransmitQueue {
+		let pageSize = (Int(descriptorCount) * MemoryLayout<Int64>.size * 2)
+		let hugepage = try Hugepage(size: pageSize, requireContiguous: true)
+		return try TransmitQueue(index: index, memory: hugepage.memoryMap, packetMempool: packetMempool, descriptorCount: descriptorCount, driver: driver)
 	}
 }
 
@@ -125,8 +158,8 @@ extension TransmitQueue {
 		 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		 0x00, 0x00, 0x00, 0x00]
 
-	public func createDummyPacket() -> DMAMempool.Pointer? {
-		guard let dummy = self.packetMempool.getFreePointer() else { return nil }
+	public mutating func createDummyPacket() -> DMAMempool.Pointer? {
+		guard var dummy = self.queue.packetMempool.getFreePointer() else { return nil }
 		let size = TransmitQueue.dummyPacketData.count
 		let ptr = dummy.entry.pointer.virtual
 

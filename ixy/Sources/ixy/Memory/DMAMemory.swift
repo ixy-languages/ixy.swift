@@ -42,7 +42,7 @@ struct DMAMemory {
 }
 
 extension DMAMemory {
-	init(virtual: UnsafeMutableRawPointer, using pagemap: Pagemap) throws {
+	init(virtual: UnsafeMutableRawPointer, using pagemap: borrowing Pagemap) throws {
 		self.virtual = virtual
 		// Generate Physical
 		guard let physical = pagemap.physical(from: virtual) else { throw Error.fetchingPhysicalAddress }

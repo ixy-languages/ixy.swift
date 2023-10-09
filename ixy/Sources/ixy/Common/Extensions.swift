@@ -50,14 +50,14 @@ func throwsError(_ block: () throws -> Void) -> Error? {
 }
 
 // MARK: - extensions for pretty-printing integers
-public extension BinaryInteger {
+extension BinaryInteger {
 	/// print the integer like a pointer (0xff00aa)
-	public var pointerString: String {
+	var pointerString: String {
 		return "0x" + String(self, radix: 16, uppercase: false)
 	}
 
 	/// print the integer like a hexadecimal (ff00aa)
-	public var hexString: String {
+	var hexString: String {
 		return String(self, radix: 16, uppercase: false)
 	}
 }

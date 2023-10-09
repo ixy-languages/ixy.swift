@@ -8,9 +8,9 @@
 import Foundation
 
 /// the mempool holds references to multiple entries, which can be 'allocated' for temporary usage and 'freed' when done
-public class DMAMempool {
+public struct DMAMempool {
 	/// use a class to wrap entry data
-	class Entry {
+	struct Entry {
 		let pointer: DMAMemory
 		let size: UInt
 		fileprivate(set) var inUse: Bool = false
@@ -22,9 +22,9 @@ public class DMAMempool {
 	}
 
 	/// the mempool pointer automatically "free"s an entry when it's released
-	public class Pointer {
-		let entry: DMAMempool.Entry
-		let mempool: DMAMempool
+	public struct Pointer {
+		var entry: DMAMempool.Entry
+		var mempool: DMAMempool
 		let id: Int
 		var size: UInt16 = 0
 
@@ -36,8 +36,9 @@ public class DMAMempool {
 			self.mempool = mempool
 		}
 
-		public func free() {
-			self.mempool.freePointer(self)
+		public mutating func free() {
+			var tmpPointer = self
+			self.mempool.freePointer(&tmpPointer)
 		}
 
 		public func touch() {
@@ -80,21 +81,21 @@ public class DMAMempool {
 		self.availableEntries = self.entries
 	}
 
-	func getFreePointer() -> Pointer? {
+	mutating func getFreePointer() -> Pointer? {
 		guard self.availableEntries.count > 0 else { return nil }
-		let pointer = self.availableEntries.removeLast()
+		var pointer = self.availableEntries.removeLast()
 		pointer.entry.inUse = true
 		return pointer
 	}
 
-	fileprivate func freePointer(_ pointer: Pointer) {
+	fileprivate mutating func freePointer(_ pointer: inout Pointer) {
 		pointer.entry.inUse = false
 		self.availableEntries.append(pointer)
 	}
 }
 
 extension DMAMemory {
-	static func byConverting(virtual: UnsafeMutableRawPointer, using pagemap: Pagemap) -> DMAMemory? {
+	static func byConverting(virtual: UnsafeMutableRawPointer, using pagemap: borrowing Pagemap) -> DMAMemory? {
 		guard let physical = pagemap.physical(from: virtual) else { return nil; }
 		return DMAMemory(virtual: virtual, physical: physical)
 	}
