@@ -1,7 +1,7 @@
 import Foundation
 
 /// a simple file wrapper class, which uses file descriptors to access the file
-internal struct File {
+internal struct File: ~Copyable {
 	internal var fd: Int32
 	internal var closeOnDealloc: Bool
 	internal var path: String?
@@ -20,24 +20,29 @@ internal struct File {
 		self.closeOnDealloc = closeOnDealloc
 	}
 
-	internal init(path: String, flags: Int32, createMode: mode_t? = nil) throws {
+	internal init(path: String, flags: Int32) throws {
 		guard let chars = path.cString(using: .utf8) else { throw FileError.internalError }
 		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
-		if let mode = createMode {
-			self.fd = open(pathPointer, flags, mode)
-		} else {
-			self.fd = open(pathPointer, flags)
-		}
-		guard self.fd >= 0 else { throw FileError.openError(errno) }
+		self.fd = open(pathPointer, flags)
+		//guard self.fd >= 0 else { throw FileError.openError(errno) }
 		self.closeOnDealloc = true
 		self.path = path
 	}
 
-	/*deinit {
+	internal init(path: String, flags: Int32, createMode: mode_t) throws {
+		guard let chars = path.cString(using: .utf8) else { throw FileError.internalError }
+		let pathPointer: UnsafePointer<CChar> = UnsafePointer(chars)
+		self.fd = open(pathPointer, flags, createMode)
+		//guard self.fd >= 0 else { throw FileError.openError(errno) }
+		self.closeOnDealloc = true
+		self.path = path
+	}
+
+	deinit {
 		if closeOnDealloc {
 			close(fd)//fixme: close file descriptor
 		}
-	}*/
+	}
 }
 
 // Read Support

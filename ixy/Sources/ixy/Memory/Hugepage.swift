@@ -59,7 +59,7 @@ struct Hugepage {
 		return file
 	}
 
-	private static func createMemoryMap(file: File, size: Int) throws -> MemoryMap {
+	private static func createMemoryMap(file: borrowing File, size: Int) throws -> MemoryMap {
 		let memoryMap = try MemoryMap(file: file, size: size, access: .readwrite, flags: [.shared, .hugetable])
 		try memoryMap.lock()
 		return memoryMap

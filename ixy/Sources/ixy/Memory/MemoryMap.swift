@@ -45,7 +45,7 @@ internal class MemoryMap {
 		munmap(self.address, self.size)
 	}
 
-	convenience init(file: File, size: Int?, access: Accessibility, flags: Flags) throws {
+	convenience init(file: borrowing File, size: Int?, access: Accessibility, flags: Flags) throws {
 		guard let path = file.path else { throw Error.invalidFile }
 		let safeSize: Int = try {
 			// use given size

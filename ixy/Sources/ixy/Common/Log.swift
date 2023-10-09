@@ -54,23 +54,23 @@ public struct Log {
 	}
 
 	internal static func log(_ message: @autoclosure () -> String, level: Level = .debug, component: Component) {
-		self.log(message, level: level, component: component.rawValue)
+		self.log(message(), level: level, component: component.rawValue)
 	}
 
 	internal static func error(_ message: @autoclosure () -> String, component: Component) {
-		log(message, level: .error, component: component)
+		log(message(), level: .error, component: component)
 	}
 
 	internal static func warn(_ message: @autoclosure () -> String, component: Component) {
-		log(message, level: .warn, component: component)
+		log(message(), level: .warn, component: component)
 	}
 
 	internal static func info(_ message: @autoclosure () -> String, component: Component) {
-		log(message, level: .info, component: component)
+		log(message(), level: .info, component: component)
 	}
 
 	internal static func debug(_ message: @autoclosure () -> String, component: Component) {
-		log(message, level: .debug, component: component)
+		log(message(), level: .debug, component: component)
 	}
 
 	internal static func formatComponent(_ component: String) -> String? {

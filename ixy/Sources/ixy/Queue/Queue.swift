@@ -26,7 +26,7 @@ public struct Queue {
 
 		let capacity = Int(descriptorCount * 2)
 		let queuePointer = memory.address.bindMemory(to: UInt64.self, capacity: capacity)
-		queuePointer.assign(repeating: UInt64(bitPattern: -1), count: capacity)
+		queuePointer.update(repeating: UInt64(bitPattern: -1), count: capacity)
 		
 		let intDescriptorCount = Int(descriptorCount)
 		self.descriptors = (0..<intDescriptorCount).map { (Idx) -> Descriptor in

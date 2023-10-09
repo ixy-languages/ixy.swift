@@ -9,7 +9,7 @@ import Foundation
 
 /// simple subclass for the pagemap file with easy initializiation based on Constants.pagemapPath and conversion
 /// from virtual to physical pointer
-struct Pagemap {
+struct Pagemap: ~Copyable {
 	let file: File
 	static var pagesize: UInt = {
 		return UInt(sysconf(Int32(_SC_PAGESIZE)))

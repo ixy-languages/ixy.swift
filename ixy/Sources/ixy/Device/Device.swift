@@ -81,8 +81,9 @@ public struct Device {
 	private static func checkConfig(address: PCIAddress) throws {
 		// try to open device config
 		let config = try DeviceConfig(address: address)
+		let configDescription = config.description
 
-		Log.debug("Device Config: \(config)", component: .device)
+		Log.debug("Device Config: \(configDescription)", component: .device)
 
 		// check vendor
 		let vendor = config.vendorID

@@ -95,7 +95,7 @@ public struct DMAMempool {
 }
 
 extension DMAMemory {
-	static func byConverting(virtual: UnsafeMutableRawPointer, using pagemap: Pagemap) -> DMAMemory? {
+	static func byConverting(virtual: UnsafeMutableRawPointer, using pagemap: borrowing Pagemap) -> DMAMemory? {
 		guard let physical = pagemap.physical(from: virtual) else { return nil; }
 		return DMAMemory(virtual: virtual, physical: physical)
 	}
